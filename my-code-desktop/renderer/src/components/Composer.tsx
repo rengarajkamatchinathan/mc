@@ -27,6 +27,7 @@ export function Composer({
   onAbort,
 }: ComposerProps): React.ReactElement {
   const [text, setText] = useState("");
+  const [pulse, setPulse] = useState(false);
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
   // ── / skills palette + @ file mentions ──
@@ -70,6 +71,8 @@ export function Composer({
     if (!text.trim() || busy) return;
     onSubmit(text);
     setText("");
+    setPulse(true);
+    window.setTimeout(() => setPulse(false), 550);
     if (ref.current) ref.current.style.height = "auto";
   };
 
@@ -136,7 +139,7 @@ export function Composer({
             <ModelPicker current={model} />
             {/* One persistent button so the arrow can morph into the stop square. */}
             <button
-              className={`send ${busy ? "stop" : ""}`}
+              className={`send ${busy ? "stop" : ""} ${pulse ? "pulse" : ""}`}
               onClick={busy ? onAbort : send}
               title={busy ? "Stop" : "Send"}
               disabled={!busy && !text.trim()}

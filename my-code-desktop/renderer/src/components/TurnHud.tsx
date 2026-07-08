@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 export interface TurnHudProps {
   busy: boolean;
@@ -22,6 +22,25 @@ export function TurnHud({ busy, tokens, turnStart }: TurnHudProps): React.ReactE
   }, [busy, turnStart]);
 
   const total = (tokens.prompt ?? 0) + (tokens.completion ?? 0);
+
+  // Ticker — ease the displayed count toward the real total for a rolling effect.
+  const [shown, setShown] = useState(total);
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
+  useEffect(() => {
+    if (shownRef.current === total) return;
+    let raf = 0;
+    const step = () => {
+      const cur = shownRef.current;
+      const diff = total - cur;
+      if (Math.abs(diff) <= 1) { setShown(total); return; }
+      setShown(cur + Math.ceil(diff * 0.18));
+      raf = window.requestAnimationFrame(step);
+    };
+    raf = window.requestAnimationFrame(step);
+    return () => window.cancelAnimationFrame(raf);
+  }, [total]);
+
   if (!turnStart && total === 0) return null;
 
   const elapsedS = turnStart ? Math.max(0, (now - turnStart) / 1000) : 0;
@@ -30,7 +49,7 @@ export function TurnHud({ busy, tokens, turnStart }: TurnHudProps): React.ReactE
   return (
     <span className="hud" title="Tokens · generation rate · elapsed">
       {busy && <span className="hud-dot" />}
-      <b>{total.toLocaleString()}</b> tok
+      <b>{shown.toLocaleString()}</b> tok
       {rate > 0 && <> · <b>{rate}</b>/s</>}
       {elapsedS >= 1 && <> · <b>{elapsedS < 60 ? `${Math.round(elapsedS)}s` : `${Math.floor(elapsedS / 60)}m ${Math.round(elapsedS % 60)}s`}</b></>}
     </span>

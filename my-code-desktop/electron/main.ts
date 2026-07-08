@@ -666,7 +666,11 @@ async function createWindow(): Promise<void> {
     height: 860,
     minWidth: 780,
     minHeight: 600,
-    backgroundColor: "#1f1e1d",
+    // Opaque fallback — the window is never see-through if Mica is unsupported.
+    backgroundColor: "#100f0e",
+    // Win11: tints the window background from the desktop wallpaper (Mica). No-op
+    // on other platforms; the renderer's translucent glass surfaces show it through.
+    backgroundMaterial: "mica",
     title: "my-code",
     icon: join(__dirname, "..", "..", "build", "icon.ico"),
     frame: false,

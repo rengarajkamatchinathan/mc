@@ -270,6 +270,10 @@ export function App(): React.ReactElement {
 
   return (
     <div className="app">
+      {/* ambient premium layer — living mesh gradient + grain + vignette */}
+      <div className="app-bg" aria-hidden="true"><b /><b /><b /><b /></div>
+      <div className="app-grain" aria-hidden="true" />
+      <div className="app-vignette" aria-hidden="true" />
       <TitleBar
         mode={mode}
         onMode={switchMode}
@@ -307,7 +311,6 @@ export function App(): React.ReactElement {
                 exit={{ opacity: 0, y: -18, scale: 0.985 }}
                 transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.7 }}
               >
-                <div className="aurora" aria-hidden="true"><b /><b /><b /></div>
                 <div className="hero-inner">
                   <Logo size={60} tile className="hero-logo" mood={busy ? (mood as MascotMood) : "idle"} />
                   <h1 className="hero-greeting">{greeting(mode, preferredName)}</h1>
