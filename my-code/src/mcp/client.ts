@@ -189,3 +189,52 @@ export async function readMcpResource(
     text: 'text' in c ? c.text : c.blob ? '[binary blob — use file path to read]' : undefined,
   }));
 }
+
+/** Fetch all prompts from a connected MCP server. Returns [] if unsupported. */
+export async function listMcpPrompts(
+  connection: McpClientConnection,
+): Promise<Array<{ name: string; description?: string; arguments?: Array<{ name: string; description?: string; required?: boolean }> }>> {
+  const c = connection.client as {
+    listPrompts?: () => Promise<{ prompts?: Array<{ name: string; description?: string; arguments?: Array<{ name: string; description?: string; required?: boolean }> }> }>;
+    request?: (req: { method: string }, schema: unknown) => Promise<{ prompts?: Array<any> }>;
+  };
+  try {
+    if (typeof c.listPrompts === 'function') {
+      const resp = await c.listPrompts();
+      return resp.prompts ?? [];
+    }
+    if (typeof c.request === 'function') {
+      const resp = await c.request({ method: 'prompts/list' }, {});
+      return resp.prompts ?? [];
+    }
+  } catch {
+    // Unsupported
+  }
+  return [];
+}
+
+/** Execute an MCP prompt template. Returns formatted prompt text. */
+export async function getMcpPrompt(
+  connection: McpClientConnection,
+  name: string,
+  args?: Record<string, string>,
+): Promise<string> {
+  const c = connection.client as {
+    getPrompt?: (params: { name: string; arguments?: Record<string, string> }) => Promise<{ description?: string; messages: Array<{ role: string; content: { type: string; text?: string } }> }>;
+    request?: (req: { method: string; params: unknown }, schema: unknown) => Promise<{ messages: Array<{ role: string; content: { type: string; text?: string } }> }>;
+  };
+  try {
+    let messages: Array<{ role: string; content: { type: string; text?: string } }> = [];
+    if (typeof c.getPrompt === 'function') {
+      const resp = await c.getPrompt({ name, arguments: args });
+      messages = resp.messages;
+    } else if (typeof c.request === 'function') {
+      const resp = await c.request({ method: 'prompts/get', params: { name, arguments: args } }, {});
+      messages = resp.messages;
+    }
+    
+    return messages.map(m => m.content.text ?? '').join('\n\n');
+  } catch (e) {
+    throw new Error(`Failed to get MCP prompt '${name}': ${e instanceof Error ? e.message : String(e)}`);
+  }
+}

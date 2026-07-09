@@ -2,6 +2,7 @@ import { loadMarkdownFilesForSubdir } from '../utils/markdownConfigLoader.js';
 import { substituteArguments } from '../utils/argumentSubstitution.js';
 import type { PromptCommand } from '../types/command.js';
 import type { FrontmatterShell } from '../utils/frontmatterParser.js';
+import { registerSkillHooks } from './registerSkillHooks.js';
 
 export async function loadSkillsFromDir(cwd: string): Promise<PromptCommand[]> {
   const mdFiles = await loadMarkdownFilesForSubdir('skills', cwd);
@@ -9,6 +10,10 @@ export async function loadSkillsFromDir(cwd: string): Promise<PromptCommand[]> {
   return mdFiles.map((file): PromptCommand => {
     const { frontmatter, content } = file;
     const name = (frontmatter.name as string) ?? file.filePath.split(/[\\/]/).pop()?.replace(/\.md$/, '') ?? 'unknown';
+
+    if (frontmatter.hooks) {
+      registerSkillHooks(frontmatter.hooks);
+    }
 
     const argumentNames = Array.isArray(frontmatter.arguments)
       ? frontmatter.arguments.map(String)

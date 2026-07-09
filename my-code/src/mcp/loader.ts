@@ -1,10 +1,13 @@
 import { z } from "zod";
+import type { CommandRegistry, SlashCommandDef } from "../commands/registry.js";
 import type { ToolRegistry } from "../tools/registry.js";
 import { buildTool } from "../tools/Tool.js";
 import { loadMcpConfig } from "./config.js";
 import {
   callMcpTool,
   connectMcpServer,
+  listMcpPrompts,
+  getMcpPrompt,
   type McpClientConnection,
   type McpToolDescriptor,
 } from "./client.js";
@@ -51,6 +54,33 @@ export async function registerMcpTools(
     }
   }
   return count;
+}
+
+export function buildMcpPromptCommand(
+  conn: McpClientConnection,
+  promptDef: { name: string; description?: string; arguments?: Array<{ name: string; description?: string; required?: boolean }> }
+): SlashCommandDef {
+  const cmdName = `mcp__${conn.serverName}__${promptDef.name}`;
+  
+  return {
+    name: cmdName,
+    description: promptDef.description ?? `MCP Prompt from ${conn.serverName}`,
+    argsHint: promptDef.arguments?.map(a => `<${a.name}>`).join(" "),
+    async execute(args: string[], ctx) {
+      const parsedArgs: Record<string, string> = {};
+      if (promptDef.arguments) {
+        promptDef.arguments.forEach((argDef, i) => {
+          if (args[i]) parsedArgs[argDef.name] = args[i];
+        });
+      }
+      try {
+        const promptText = await getMcpPrompt(conn, promptDef.name, parsedArgs);
+        await ctx.submitPrompt(promptText);
+      } catch (e) {
+        ctx.push(`Failed to get MCP prompt: ${e instanceof Error ? e.message : String(e)}`, "error");
+      }
+    }
+  };
 }
 
 /**

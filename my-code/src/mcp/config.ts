@@ -46,3 +46,36 @@ export async function loadMcpConfig(cwd: string): Promise<NamedMcpServer[]> {
   }
   return Object.entries(merged).map(([name, config]) => ({ name, config }));
 }
+
+/**
+ * Save MCP servers to the project-scoped mcp.json file.
+ */
+export async function saveMcpConfig(cwd: string, serverName: string, config: NamedMcpServer["config"] | null): Promise<void> {
+  const p = projectMcpPaths(cwd)[0];
+  if (!p) throw new Error("Could not determine project MCP path.");
+  
+  let f: McpFile = { servers: {} };
+  
+  try {
+    const txt = await fs.readFile(p, "utf8");
+    f = JSON.parse(txt) as McpFile;
+  } catch (e: unknown) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") {
+      throw new Error(`MCP config ${p} is invalid: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
+  // Handle differences in root key 'servers' vs 'mcpServers' which standard MCP uses.
+  const rootObj = (f.servers || (f as any).mcpServers || {}) as Record<string, NamedMcpServer["config"]>;
+  
+  if (config === null) {
+    delete rootObj[serverName];
+  } else {
+    rootObj[serverName] = config;
+  }
+  
+  f.servers = rootObj;
+  
+  await fs.mkdir(path.dirname(p), { recursive: true });
+  await fs.writeFile(p, JSON.stringify(f, null, 2), "utf8");
+}

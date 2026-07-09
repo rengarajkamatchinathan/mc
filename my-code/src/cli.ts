@@ -324,13 +324,14 @@ async function bootstrap(
     // Non-fatal — AgentTool is optional
   }
 
+
+
   // MCP servers — connect & register their tools.
   try {
     const mcpServers = await loadMcpServers(cwd);
     if (mcpServers.length > 0) {
       const count = await registerMcpTools(registry, mcpServers);
-      if (count > 0) {
-        process.stderr.write(
+      if (count > 0 && process.env.MY_CODE_DEBUG === "1") {     process.stderr.write(
           chalk.gray(`  ⎯ MCP: ${count} tool(s) loaded from ${mcpServers.length} server(s)\n`)
         );
       }

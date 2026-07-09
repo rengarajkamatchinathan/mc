@@ -12,6 +12,7 @@ import {
   messagesFromTranscript,
   formatSessionList,
 } from "../session/transcript.js";
+import { mcpCommand } from "./mcp.js";
 import { listConfig, setConfigKey } from "../config/globalConfig.js";
 import {
   listAccounts,
@@ -322,31 +323,7 @@ const worktreeCommand: SlashCommandDef = {
   },
 };
 
-const mcpCommand: SlashCommandDef = {
-  name: "mcp",
-  description: "List configured MCP servers and tools",
-  execute(_, ctx) {
-    const mcpTools = ctx.registry.list().filter((t) => t.name.startsWith("mcp__"));
-    if (mcpTools.length === 0) {
-      ctx.push("No MCP servers connected. Configure servers in ~/.my-code/mcp.json or .my-code/mcp.json (see README).");
-      return;
-    }
-    const byServer = new Map<string, string[]>();
-    for (const t of mcpTools) {
-      const parts = t.name.split("__");
-      const server = parts[1] ?? "unknown";
-      const tool = parts.slice(2).join("__");
-      const list = byServer.get(server) ?? [];
-      list.push(tool);
-      byServer.set(server, list);
-    }
-    const lines: string[] = [];
-    for (const [server, tools] of byServer) {
-      lines.push(`${server} (${tools.length} tools): ${tools.join(", ")}`);
-    }
-    ctx.push(lines.join("\n"));
-  },
-};
+
 
 // ─── Stats & Cost ───────────────────────────────────────────────────────────
 

@@ -503,13 +503,27 @@ function AppInner({
   // ─── Modular command dispatch (replaces the old 350-line switch/case) ───
   const commandRegistry = useMemo(() => {
     const reg = createCommandRegistry();
-    // Load skills asynchronously and register them (Phase 4.2)
+    // Load skills and MCP prompts asynchronously and register them (Phase 4.2)
     (async () => {
       try {
         const { loadSkills, skillToCommand } = await import("../skills/index.js");
         const skills = await loadSkills(cwd);
         for (const skill of skills) {
           reg.register(skillToCommand(skill));
+        }
+      } catch {}
+
+      try {
+        const { getConnections, buildMcpPromptCommand } = await import("../mcp/loader.js");
+        const { listMcpPrompts } = await import("../mcp/client.js");
+        const conns = getConnections();
+        for (const conn of conns) {
+          try {
+            const prompts = await listMcpPrompts(conn);
+            for (const p of prompts) {
+              reg.register(buildMcpPromptCommand(conn, p));
+            }
+          } catch {}
         }
       } catch {}
     })();

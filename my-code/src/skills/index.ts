@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { parseFrontmatter, type FrontmatterShell } from '../utils/frontmatterParser.js';
+import { registerSkillHooks } from './registerSkillHooks.js';
 
 /**
  * Load all skills from user and project directories and bundled skills.
@@ -26,9 +27,13 @@ export async function loadSkills(cwd: string): Promise<PromptCommand[]> {
         const rawContent = await fs.readFile(filePath, 'utf-8');
         const { frontmatter, content } = parseFrontmatter(rawContent, filePath);
         const name = (frontmatter.name as string) ?? entry.name.replace(/\.md$/, '');
+        if (frontmatter.hooks) {
+          registerSkillHooks(frontmatter.hooks);
+        }
+
         bundledMdSkills.push({
           type: 'prompt',
-          name,
+          name: (frontmatter.name as string) ?? name,
           description: (frontmatter.description as string) ?? `Skill: ${name}`,
           prompt: content,
           argumentNames: Array.isArray(frontmatter.args) ? frontmatter.args.map(String) : [],
