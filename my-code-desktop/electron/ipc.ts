@@ -264,6 +264,7 @@ export const IPC = {
   addAccount: "mc:add-account",
   removeAccount: "mc:remove-account",
   setActiveAccount: "mc:set-active-account",
+  restartBackend: "mc:restart-backend",
   readEnvDefaults: "mc:read-env-defaults",
   getPermissions: "mc:get-permissions",
   editPermission: "mc:edit-permission",
@@ -282,6 +283,7 @@ export const IPC = {
   windowClose: "mc:window-close",
   /** main → renderer (one-way) */
   engineEvent: "mc:engine-event",
+  bootstrapChanged: "mc:bootstrap-changed",
   clearTranscript: "mc:clear-transcript",
   loadTranscript: "mc:load-transcript",
   connectorEvent: "mc:connector-event",
@@ -316,6 +318,8 @@ export interface McApi {
   addAccount(input: AccountInput): Promise<void>;
   removeAccount(id: string): Promise<void>;
   setActiveAccount(id: string): Promise<Bootstrap>;
+  /** Restart the `my-code serve` child (used by the error card's Retry). */
+  restartBackend(): Promise<Bootstrap>;
   /** Parse Azure Foundry fields from a .env file (default: the synfra project) to pre-fill the add form. */
   readEnvDefaults(path?: string): Promise<AzureEnvDefaults | null>;
   getPermissions(): Promise<Permissions>;
@@ -335,6 +339,8 @@ export interface McApi {
   windowToggleMaximize(): void;
   windowClose(): void;
   onEngineEvent(cb: (ev: EngineEvent) => void): () => void;
+  /** Fired after any backend restart (account/model/permission changes) with the fresh state. */
+  onBootstrapChanged(cb: (b: Bootstrap) => void): () => void;
   onClearTranscript(cb: () => void): () => void;
   onLoadTranscript(cb: (messages: HistoryMessage[]) => void): () => void;
   onConnectorEvent(cb: (ev: ConnectorEvent) => void): () => void;

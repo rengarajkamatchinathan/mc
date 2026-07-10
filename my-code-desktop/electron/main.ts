@@ -288,6 +288,8 @@ async function startBackend(opts: { sessionId?: string } = {}): Promise<Bootstra
 async function restartBackend(): Promise<void> {
   const sessionId = backend?.info()?.sessionId;
   await startBackend(sessionId ? { sessionId } : {});
+  // Keep the renderer's model/session badge in sync with the new backend.
+  if (win && !win.isDestroyed()) win.webContents.send(IPC.bootstrapChanged, bootstrapView());
 }
 
 /** Current backend state as a Bootstrap (for settings handlers that restart). */
@@ -595,9 +597,19 @@ function wireIpc(): void {
   ipcMain.handle(IPC.readEnvDefaults, (_e, p?: string) =>
     store.readAzureEnvDefaults(p || defaultSynfraEnvPath())
   );
-  ipcMain.handle(IPC.removeAccount, (_e, id: string) => store.removeAccount(id));
+  ipcMain.handle(IPC.removeAccount, async (_e, id: string) => {
+    const { activeId } = await store.listAccounts();
+    await store.removeAccount(id);
+    // Removing the account the backend is running on must not leave a stale
+    // backend using deleted credentials.
+    if (activeId === id) await restartBackend();
+  });
   ipcMain.handle(IPC.setActiveAccount, async (_e, id: string) => {
     await store.setActiveAccount(id);
+    await restartBackend();
+    return bootstrapView();
+  });
+  ipcMain.handle(IPC.restartBackend, async () => {
     await restartBackend();
     return bootstrapView();
   });

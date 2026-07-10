@@ -848,7 +848,18 @@ async function runServe(
   // a headless process must never block on readline.
   await trustDirectory(cwd);
 
-  const resumeId = opts.sessionId;
+  // Resume is best-effort in serve mode: bootstrap() exits the process when a
+  // session can't be loaded (fine interactively, fatal for a GUI backend — the
+  // desktop restarts with `--session <id>` even for brand-new empty sessions,
+  // e.g. after an account switch). Pre-check and fall back to a fresh session.
+  let resumeId = opts.sessionId;
+  if (resumeId) {
+    const resumable = await loadTranscriptForResume(cwd, resumeId).catch(() => null);
+    if (!resumable) {
+      process.stderr.write(`session ${resumeId} has no resumable transcript — starting fresh\n`);
+      resumeId = undefined;
+    }
+  }
   const { engine, registry, stats, model, bridge } = await bootstrap(opts, resumeId);
 
   if (!bridge) {

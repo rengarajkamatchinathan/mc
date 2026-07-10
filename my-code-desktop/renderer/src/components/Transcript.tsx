@@ -14,13 +14,15 @@ export interface TranscriptProps {
   greeting: string;
   /** Resend the last user prompt. */
   onRetry: () => void;
+  /** Restart the backend, then resend the last unanswered prompt (error card). */
+  onRetryBackend: () => void;
   /** Load a message's text back into the composer. */
   onEdit: (text: string) => void;
   /** Open the settings modal (used by error-card actions). */
   onOpenSettings: () => void;
 }
 
-export function Transcript({ items, busy, mood, onRetry, onEdit, onOpenSettings }: TranscriptProps): React.ReactElement {
+export function Transcript({ items, busy, mood, onRetry, onRetryBackend, onEdit, onOpenSettings }: TranscriptProps): React.ReactElement {
   const endRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevLen = useRef(0);
@@ -44,7 +46,7 @@ export function Transcript({ items, busy, mood, onRetry, onEdit, onOpenSettings 
     <div className="transcript" ref={scrollRef}>
       <div className="thread">
         {items.map((it) => (
-          <Row key={it.id} it={it} onRetry={onRetry} onEdit={onEdit} onOpenSettings={onOpenSettings} />
+          <Row key={it.id} it={it} onRetry={onRetry} onRetryBackend={onRetryBackend} onEdit={onEdit} onOpenSettings={onOpenSettings} />
         ))}
         {busy && mood === "thinking" && (
           <div className="status-line">
@@ -61,6 +63,7 @@ export function Transcript({ items, busy, mood, onRetry, onEdit, onOpenSettings 
 interface RowProps {
   it: Item;
   onRetry: () => void;
+  onRetryBackend: () => void;
   onEdit: (text: string) => void;
   onOpenSettings: () => void;
 }
@@ -69,7 +72,7 @@ interface RowProps {
 // App's reducers preserve object identity for untouched items, and the handler
 // props are stable (useCallback in App), so shallow-equal props let every prior
 // row skip re-render while the last one streams.
-const Row = React.memo(function Row({ it, onRetry, onEdit, onOpenSettings }: RowProps): React.ReactElement | null {
+const Row = React.memo(function Row({ it, onRetry, onRetryBackend, onEdit, onOpenSettings }: RowProps): React.ReactElement | null {
   switch (it.kind) {
     case "user":
       return (
@@ -109,7 +112,7 @@ const Row = React.memo(function Row({ it, onRetry, onEdit, onOpenSettings }: Row
         </div>
       );
     case "notice":
-      return <NoticeCard it={it} onRetry={onRetry} onOpenSettings={onOpenSettings} />;
+      return <NoticeCard it={it} onRetry={onRetryBackend} onOpenSettings={onOpenSettings} />;
     default:
       return null;
   }

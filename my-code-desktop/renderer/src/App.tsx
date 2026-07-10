@@ -151,6 +151,12 @@ export function App(): React.ReactElement {
     });
   }, [refreshSessions]);
 
+  // Backend restarts (account/model/permission changes) push fresh state so the
+  // model badge and session id never go stale while the settings modal is open.
+  useEffect(() => {
+    return window.mycode.onBootstrapChanged((b) => setBoot(b));
+  }, []);
+
   useEffect(() => {
     return window.mycode.onClearTranscript(() => {
       setItems([]);
@@ -193,6 +199,34 @@ export function App(): React.ReactElement {
   }, []);
   const onEditMsg = useCallback((text: string) => setSeed(text + " "), []);
   const onOpenSettingsCb = useCallback(() => setSettingsOpen(true), []);
+
+  // Error-card Retry. A "Something went wrong" card usually means the serve
+  // process is dead — resending a prompt into a dead bridge vanishes silently.
+  // Restart the backend first (with visible progress), then resend the last
+  // user prompt only if it never got an answer.
+  const onRetryBackend = useCallback(async () => {
+    setItems((p) => [...p, { kind: "notice", id: newId(), tone: "info", text: "Restarting backend…" }]);
+    setBusy(true);
+    setMood("thinking");
+    try {
+      const b = await window.mycode.restartBackend();
+      setBoot(b);
+      if (b.model === "—") return; // failed again — a backend_error card explains why
+      setItems((p) => [...p, { kind: "notice", id: newId(), tone: "info", text: `Backend ready (${b.model}).` }]);
+      const xs = itemsRef.current;
+      for (let i = xs.length - 1; i >= 0; i--) {
+        const it = xs[i];
+        if (it.kind === "assistant" && !it.streaming) return; // last prompt was answered
+        if (it.kind === "user") {
+          void window.mycode.sendPrompt(it.text);
+          return;
+        }
+      }
+    } finally {
+      setBusy(false);
+      setMood("idle");
+    }
+  }, []);
 
   // Ctrl/⌘+K toggles the command palette.
   useEffect(() => {
@@ -354,6 +388,7 @@ export function App(): React.ReactElement {
                   mood={mood}
                   greeting={preferredName}
                   onRetry={onRetry}
+                  onRetryBackend={onRetryBackend}
                   onEdit={onEditMsg}
                   onOpenSettings={onOpenSettingsCb}
                 />

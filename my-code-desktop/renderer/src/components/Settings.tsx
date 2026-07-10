@@ -460,8 +460,27 @@ function AccountPanel(): React.ReactElement {
   const [showAdd, setShowAdd] = useState(false);
   const [f, setF] = useState(emptyForm);
   const [msg, setMsg] = useState<string>("");
+  /** Account id currently being switched to (backend restart in flight). */
+  const [switching, setSwitching] = useState<string | null>(null);
   const load = () => void window.mycode.getAccounts().then(setList);
   useEffect(load, []);
+
+  const makeActive = async (a: { id: string; name: string }) => {
+    if (switching) return; // one switch at a time
+    setSwitching(a.id);
+    setMsg(`Switching to ${a.name} — restarting backend…`);
+    try {
+      const b = await window.mycode.setActiveAccount(a.id);
+      setMsg(b.model !== "—"
+        ? `Now using ${a.name} (${b.model}).`
+        : `Switched to ${a.name}, but the backend failed to start — check the endpoint/key.`);
+    } catch (e) {
+      setMsg(`Couldn't switch account: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSwitching(null);
+      load();
+    }
+  };
 
   const isAzure = f.provider === "azure-foundry";
 
@@ -562,8 +581,10 @@ function AccountPanel(): React.ReactElement {
                 <span className="conn-status">
                   {list?.activeId === a.id
                     ? <span className="ok"><Icon name="circleCheck" size={14} /> active</span>
-                    : <button className="link-btn" onClick={() => window.mycode.setActiveAccount(a.id)}>Make active</button>}
-                  <button className="link-btn danger" onClick={async () => { await window.mycode.removeAccount(a.id); load(); }}>Remove</button>
+                    : switching === a.id
+                      ? <span className="conn-type">switching…</span>
+                      : <button className="link-btn" disabled={!!switching} onClick={() => void makeActive(a)}>Make active</button>}
+                  <button className="link-btn danger" disabled={!!switching} onClick={async () => { await window.mycode.removeAccount(a.id); load(); }}>Remove</button>
                 </span>
               </div>
             ))}

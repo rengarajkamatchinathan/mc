@@ -50,6 +50,7 @@ const api: McApi = {
   addAccount: (input) => ipcRenderer.invoke(IPC.addAccount, input) as Promise<void>,
   removeAccount: (id) => ipcRenderer.invoke(IPC.removeAccount, id) as Promise<void>,
   setActiveAccount: (id) => ipcRenderer.invoke(IPC.setActiveAccount, id) as Promise<Bootstrap>,
+  restartBackend: () => ipcRenderer.invoke(IPC.restartBackend) as Promise<Bootstrap>,
   readEnvDefaults: (path?: string) =>
     ipcRenderer.invoke(IPC.readEnvDefaults, path) as Promise<import("./ipc.js").AzureEnvDefaults | null>,
   getPermissions: () => ipcRenderer.invoke(IPC.getPermissions) as Promise<import("./ipc.js").Permissions>,
@@ -71,6 +72,11 @@ const api: McApi = {
     const handler = (_e: Electron.IpcRendererEvent, ev: EngineEvent) => cb(ev);
     ipcRenderer.on(IPC.engineEvent, handler);
     return () => ipcRenderer.removeListener(IPC.engineEvent, handler);
+  },
+  onBootstrapChanged: (cb: (b: Bootstrap) => void) => {
+    const handler = (_e: Electron.IpcRendererEvent, b: Bootstrap) => cb(b);
+    ipcRenderer.on(IPC.bootstrapChanged, handler);
+    return () => ipcRenderer.removeListener(IPC.bootstrapChanged, handler);
   },
   onClearTranscript: (cb: () => void) => {
     const handler = () => cb();
