@@ -12,18 +12,25 @@ export interface TitleBarProps {
   mood?: MascotMood;
 }
 
+const isMac = window.mycode.platform === "darwin";
+
 export function TitleBar({ mode, onMode, onOpenSettings, onOpenCommand, mood }: TitleBarProps): React.ReactElement {
   return (
-    <header className="titlebar">
+    <header className={`titlebar ${isMac ? "is-mac" : ""}`}>
       <div className="titlebar-left">
-        {/* macOS-style traffic lights — wired to the real window controls */}
-        <div className="traffic no-drag">
-          <button className="tl tl-close" onClick={() => window.mycode.windowClose()} title="Close" aria-label="Close" />
-          <button className="tl tl-min" onClick={() => window.mycode.windowMinimize()} title="Minimize" aria-label="Minimize" />
-          <button className="tl tl-max" onClick={() => window.mycode.windowToggleMaximize()} title="Zoom" aria-label="Zoom" />
-        </div>
+        {/* On macOS the window shows the REAL traffic lights (titleBarStyle:
+            "hidden"), so drawing CSS clones would double them — the .is-mac
+            class instead pads past the native ones. Elsewhere the window is
+            fully frameless and these buttons are the window controls. */}
+        {!isMac && (
+          <div className="traffic no-drag">
+            <button className="tl tl-close" onClick={() => window.mycode.windowClose()} title="Close" aria-label="Close" />
+            <button className="tl tl-min" onClick={() => window.mycode.windowMinimize()} title="Minimize" aria-label="Minimize" />
+            <button className="tl tl-max" onClick={() => window.mycode.windowToggleMaximize()} title="Zoom" aria-label="Zoom" />
+          </div>
+        )}
         <Logo size={20} className="titlebar-logo" mood={mood} />
-        <span className="titlebar-brand">Sunday</span>
+        <span className="titlebar-brand">my-code</span>
       </div>
 
       <div className="mode-tabs no-drag">

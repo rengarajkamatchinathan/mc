@@ -9,11 +9,12 @@ import {
 } from "../theme";
 import { Icon, MicrosoftMark } from "./Icon";
 
-type Section = "general" | "theme" | "account" | "models" | "permissions" | "connectors" | "skills" | "usage" | "plugins";
+export type SettingsSection = "general" | "theme" | "account" | "models" | "permissions" | "connectors" | "skills" | "usage" | "plugins";
+type Section = SettingsSection;
 type Tab = "all" | "connected" | "not";
 
-export function Settings({ onClose }: { onClose: () => void }): React.ReactElement {
-  const [section, setSection] = useState<Section>("general");
+export function Settings({ onClose, initialSection }: { onClose: () => void; initialSection?: SettingsSection }): React.ReactElement {
+  const [section, setSection] = useState<Section>(initialSection ?? "general");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
@@ -438,7 +439,7 @@ function ModelsPanel(): React.ReactElement {
 const emptyForm = { provider: "ollama", name: "", apiKey: "", host: "", deployment: "", apiVersion: "", model: "" };
 
 /** Human label for a provider id. */
-function providerLabel(p: string): string {
+export function providerLabel(p: string): string {
   switch (p) {
     case "azure-foundry": return "Azure Foundry";
     case "ollama": return "Ollama";
@@ -449,7 +450,7 @@ function providerLabel(p: string): string {
 }
 
 /** Order providers for display; known ones first, unknown appended. */
-function orderProviders(providers: string[]): string[] {
+export function orderProviders(providers: string[]): string[] {
   const order = ["azure-foundry", "ollama", "openai", "gemini"];
   const rank = (p: string) => { const i = order.indexOf(p); return i < 0 ? order.length : i; };
   return [...providers].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));

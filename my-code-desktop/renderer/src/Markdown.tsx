@@ -3,7 +3,7 @@
  *
  * Models emit `**bold**`, `- bullets`, `# headers`, `` `code` ``, fenced code
  * blocks, tables, blockquotes and links even when the persona says "plain
- * text". Without this, Sunday's replies show literal asterisks.
+ * text". Without this, my-code's replies show literal asterisks.
  *
  * Intentionally not a CommonMark parser — covers the subset the model actually
  * emits, plus lightweight syntax highlighting for fenced code.
@@ -13,6 +13,12 @@ import React, { useState } from "react";
 
 export interface MarkdownProps {
   content: string;
+  /**
+   * While true, plain text is split into per-word spans so words newly
+   * appended by a delta mount fresh and fade in (Claude-style soft reveal).
+   * On finalize the same content re-renders unsplit and the DOM collapses.
+   */
+  streaming?: boolean;
 }
 
 /**
@@ -21,7 +27,7 @@ export interface MarkdownProps {
  */
 export const Markdown = React.memo(MarkdownImpl);
 
-function MarkdownImpl({ content }: MarkdownProps): React.ReactElement {
+function MarkdownImpl({ content, streaming = false }: MarkdownProps): React.ReactElement {
   const lines = content.split("\n");
   const blocks: React.ReactElement[] = [];
   let i = 0;
@@ -90,7 +96,7 @@ function MarkdownImpl({ content }: MarkdownProps): React.ReactElement {
       while (i < lines.length) {
         const m = /^(\s*)[-*]\s+(.*)$/.exec(lines[i]);
         if (!m) break;
-        items.push(<li key={items.length} className="md-li">{renderInline(m[2])}</li>);
+        items.push(<li key={items.length} className="md-li">{renderInline(m[2], streaming)}</li>);
         i++;
       }
       blocks.push(<ul key={key++} className="md-ul">{items}</ul>);
@@ -101,7 +107,7 @@ function MarkdownImpl({ content }: MarkdownProps): React.ReactElement {
     if (line.trim() === "") { blocks.push(<div key={key++} className="md-spacer" />); i++; continue; }
 
     // Plain paragraph line
-    blocks.push(<p key={key++} className="md-p">{renderInline(line)}</p>);
+    blocks.push(<p key={key++} className="md-p">{renderInline(line, streaming)}</p>);
     i++;
   }
   return <div className="md">{blocks}</div>;
@@ -178,14 +184,26 @@ function highlight(code: string): React.ReactNode[] {
  * Tokenize one line on links, **bold**, *italic*, _italic_, and `code`. Order
  * matters — links & bold first so single-* italic doesn't swallow `**bold**`.
  */
-function renderInline(line: string): React.ReactNode[] {
+function renderInline(line: string, streaming = false): React.ReactNode[] {
   const re = /(\[[^\]\n]+\]\([^)\n]+\)|\*\*[^*\n]+\*\*|`[^`\n]+`|\*[^*\n]+\*|_[^_\n]+_)/g;
   const out: React.ReactNode[] = [];
   let lastIdx = 0;
   let key = 0;
+  // While streaming, plain text becomes per-word spans: an appended word is a
+  // NEW element (prior words keep their keys), so its mount animation fires
+  // exactly once. Finalizing re-renders unsplit and the extra spans vanish.
+  const pushText = (text: string) => {
+    if (!streaming) {
+      out.push(<span key={key++}>{text}</span>);
+      return;
+    }
+    for (const w of text.split(/(?<=\s)/)) {
+      if (w) out.push(<span key={key++} className="wfade">{w}</span>);
+    }
+  };
   let m: RegExpExecArray | null;
   while ((m = re.exec(line)) !== null) {
-    if (m.index > lastIdx) out.push(<span key={key++}>{line.slice(lastIdx, m.index)}</span>);
+    if (m.index > lastIdx) pushText(line.slice(lastIdx, m.index));
     const tok = m[0];
     if (tok.startsWith("[")) {
       const lm = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok);
@@ -213,6 +231,6 @@ function renderInline(line: string): React.ReactNode[] {
     }
     lastIdx = re.lastIndex;
   }
-  if (lastIdx < line.length) out.push(<span key={key++}>{line.slice(lastIdx)}</span>);
+  if (lastIdx < line.length) pushText(line.slice(lastIdx));
   return out;
 }

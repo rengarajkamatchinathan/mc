@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import { AccountMenu } from "./AccountMenu";
+import type { SettingsSection } from "./Settings";
 import type { Bootstrap, Mode, SessionMeta } from "../../../electron/ipc";
 
 export interface SidebarProps {
@@ -12,7 +14,7 @@ export interface SidebarProps {
   onResume: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (section?: SettingsSection) => void;
 }
 
 /** Bucket sessions into Today / Yesterday / Last 7 days / Older by updatedAt. */
@@ -74,7 +76,7 @@ export function Sidebar({
       <nav className="side-nav">
         <button className="side-link" disabled><Icon name="folder" size={16} /> Projects</button>
         <button className="side-link" disabled><Icon name="layers" size={16} /> Artifacts</button>
-        <button className="side-link" onClick={onOpenSettings}><Icon name="sliders" size={16} /> Customize</button>
+        <button className="side-link" onClick={() => onOpenSettings()}><Icon name="sliders" size={16} /> Customize</button>
       </nav>
 
       <div className="recents">
@@ -104,13 +106,7 @@ export function Sidebar({
       </div>
 
       <div className="sidebar-foot">
-        <div className="account">
-          <span className="avatar"><Icon name="user" size={16} /></span>
-          <div className="account-meta">
-            <div className="account-name">my-code</div>
-            <div className="account-sub">{boot?.model ?? "…"}</div>
-          </div>
-        </div>
+        <AccountMenu boot={boot} onOpenSettings={onOpenSettings} />
       </div>
     </aside>
   );

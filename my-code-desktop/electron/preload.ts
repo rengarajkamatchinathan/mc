@@ -19,6 +19,7 @@ import {
 } from "./ipc.js";
 
 const api: McApi = {
+  platform: process.platform,
   bootstrap: () => ipcRenderer.invoke(IPC.bootstrap) as Promise<Bootstrap>,
   sendPrompt: (text) => ipcRenderer.invoke(IPC.sendPrompt, text) as Promise<void>,
   abort: () => ipcRenderer.invoke(IPC.abort) as Promise<void>,
@@ -51,6 +52,7 @@ const api: McApi = {
   removeAccount: (id) => ipcRenderer.invoke(IPC.removeAccount, id) as Promise<void>,
   setActiveAccount: (id) => ipcRenderer.invoke(IPC.setActiveAccount, id) as Promise<Bootstrap>,
   restartBackend: () => ipcRenderer.invoke(IPC.restartBackend) as Promise<Bootstrap>,
+  getVersion: () => ipcRenderer.invoke(IPC.getVersion) as Promise<string>,
   readEnvDefaults: (path?: string) =>
     ipcRenderer.invoke(IPC.readEnvDefaults, path) as Promise<import("./ipc.js").AzureEnvDefaults | null>,
   getPermissions: () => ipcRenderer.invoke(IPC.getPermissions) as Promise<import("./ipc.js").Permissions>,

@@ -265,6 +265,7 @@ export const IPC = {
   removeAccount: "mc:remove-account",
   setActiveAccount: "mc:set-active-account",
   restartBackend: "mc:restart-backend",
+  getVersion: "mc:get-version",
   readEnvDefaults: "mc:read-env-defaults",
   getPermissions: "mc:get-permissions",
   editPermission: "mc:edit-permission",
@@ -290,6 +291,8 @@ export const IPC = {
 } as const;
 
 export interface McApi {
+  /** OS platform ("darwin" | "win32" | "linux") — window chrome differs per OS. */
+  platform: string;
   bootstrap(): Promise<Bootstrap>;
   sendPrompt(text: string): Promise<void>;
   abort(): Promise<void>;
@@ -320,6 +323,8 @@ export interface McApi {
   setActiveAccount(id: string): Promise<Bootstrap>;
   /** Restart the `my-code serve` child (used by the error card's Retry). */
   restartBackend(): Promise<Bootstrap>;
+  /** App version (package.json) — shown in the account menu. */
+  getVersion(): Promise<string>;
   /** Parse Azure Foundry fields from a .env file (default: the synfra project) to pre-fill the add form. */
   readEnvDefaults(path?: string): Promise<AzureEnvDefaults | null>;
   getPermissions(): Promise<Permissions>;

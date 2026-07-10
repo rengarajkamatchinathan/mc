@@ -70,6 +70,8 @@ input, textarea, select { font-family: inherit; }
 }
 .no-drag { -webkit-app-region: no-drag; }
 .titlebar-left { justify-self: start; display: flex; align-items: center; gap: var(--sp-2); }
+/* macOS shows the native traffic lights at x:16 — clear them (3×12px + gaps). */
+.titlebar.is-mac .titlebar-left { padding-left: 74px; }
 .titlebar-right { justify-self: end; display: flex; align-items: center; gap: var(--sp-2); }
 .titlebar-logo { display: block; }
 .titlebar-brand { font-size: var(--fs-md); font-weight: 600; color: var(--text-dim); }
@@ -153,10 +155,45 @@ input, textarea, select { font-family: inherit; }
 .recent-menu button.danger:hover { background: rgba(248,81,73,.15); }
 
 .sidebar-foot { border-top: 1px solid var(--border); padding-top: 10px; margin-top: 8px; }
-.account { display: flex; align-items: center; gap: 9px; padding: 4px 6px; }
-.avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-elev); color: var(--text-dim); }
+.account-wrap { position: relative; }
+.account {
+  display: flex; align-items: center; gap: 9px; padding: 4px 6px;
+  width: 100%; text-align: left; background: none; border: none; color: var(--text);
+  border-radius: var(--r-md); transition: background .12s ease;
+}
+.account:hover, .account.open { background: var(--bg-elev); }
+.avatar { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; background: var(--bg-elev); color: var(--text-dim); flex: 0 0 28px; }
 .account-name { font-size: var(--fs-md); font-weight: 550; }
 .account-sub { font-size: var(--fs-xs); color: var(--text-faint); }
+.am-chev { margin-left: auto; color: var(--text-faint); display: inline-flex; }
+
+/* ─── Account popover (Claude-Desktop-style, opens upward) ─── */
+.account-menu {
+  position: absolute; bottom: calc(100% + 8px); left: 0; right: 0; z-index: 30;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0,0,0,.45); padding: 6px;
+  animation: menuUp .12s ease;
+}
+@keyframes menuUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.am-header { display: flex; align-items: center; gap: 9px; padding: 6px 8px 8px; }
+.am-sep { height: 1px; background: var(--border); margin: 4px 2px; }
+.am-label { font-size: var(--fs-xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: .06em; padding: 4px 8px 2px; }
+.am-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text);
+  font-size: var(--fs-md); padding: 7px 8px; border-radius: 8px;
+}
+.am-item:hover:not(:disabled) { background: var(--bg); }
+.am-item:disabled { opacity: .9; }
+.am-item.am-account:disabled:not(.on) { opacity: .45; }
+.am-ico { display: inline-flex; align-items: center; justify-content: center; width: 16px; flex: 0 0 16px; color: var(--text-dim); }
+.am-item.on .am-ico { color: var(--ok, #4ec98a); }
+.am-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.am-prov { margin-left: auto; font-size: var(--fs-xs); color: var(--text-faint); flex: 0 0 auto; }
+.am-note { font-size: var(--fs-xs); color: var(--text-faint); padding: 5px 8px 3px; }
+.am-version { font-size: var(--fs-xs); color: var(--text-faint); padding: 4px 8px 2px; }
+.am-spin { animation: amSpin .8s linear infinite; }
+@keyframes amSpin { to { transform: rotate(360deg); } }
 
 /* ─── Main ─── */
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
@@ -216,6 +253,15 @@ button:focus-visible, .fld:focus-visible, textarea:focus-visible, input:focus-vi
 }
 .thinking-head .chev { display: inline-flex; align-items: center; transition: transform .25s ease; }
 .thinking.open .thinking-head .chev { transform: rotate(180deg); }
+.think-elapsed { color: var(--text-faint); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+/* live preview of the last reasoning line, ghosting under the label */
+.think-preview {
+  color: var(--text-faint); font-size: var(--fs-sm); font-style: italic;
+  padding: 1px 2px 3px 22px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  max-width: 620px;
+  mask-image: linear-gradient(90deg, #000 78%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent);
+}
 .spark { color: var(--accent); display: inline-flex; align-items: center; }
 @keyframes sparkPulse { 0%,100% { opacity: .5; transform: scale(.9); } 50% { opacity: 1; transform: scale(1.1); } }
 /* body collapses via the grid-rows trick — no JS height measuring */
@@ -227,6 +273,21 @@ button:focus-visible, .fld:focus-visible, textarea:focus-visible, input:focus-vi
 /* ─── Tool cards ─── */
 .tool-card { width: 100%; border: 1px solid var(--border); border-radius: 11px; background: var(--bg-elev); margin: 6px 0; overflow: hidden; }
 .tool-card.error { border-color: rgba(248,81,73,.4); }
+.tool-card.running { border-color: rgba(78,201,138,.35); animation: runPulse 2s ease-in-out infinite; }
+@keyframes runPulse { 50% { border-color: rgba(78,201,138,.12); } }
+.tool-metric {
+  margin-left: auto; color: var(--text-faint); font-size: var(--fs-sm);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto;
+}
+.tm-ok { color: #4ec98a; display: inline-flex; }
+.tm-err { color: var(--del); font-weight: 600; }
+.tool-args {
+  font-family: var(--mono); font-size: var(--fs-sm); color: var(--text-dim);
+  padding: 8px 13px; border-top: 1px dashed var(--border);
+  white-space: pre-wrap; word-break: break-all;
+}
+.tool-args .ta-prompt { color: var(--text-faint); }
 .tool-head { width: 100%; display: flex; align-items: center; gap: 9px; background: none; border: none; padding: 9px 12px; font-size: var(--fs-md); }
 .tool-head.static { cursor: default; }
 .tool-glyph { color: var(--accent); display: inline-flex; align-items: center; }
@@ -545,15 +606,48 @@ select.fld { appearance: none; }
 .sentinel-error .mc-eye { fill: var(--del); }
 .sentinel-error .halo { opacity: .5; background: radial-gradient(circle, var(--del), transparent 65%); }
 
-/* ─── Shimmer status line (replaces the bouncing dots) ─── */
+/* ─── Live status line: breathing orb + activity verb + elapsed ─── */
 .status-line { display: flex; align-items: center; gap: 9px; padding: 6px 2px; animation: rowIn .3s ease both; }
+.status-orb {
+  width: 13px; height: 13px; border-radius: 50%; flex: 0 0 13px;
+  background: radial-gradient(circle at 35% 30%, #ffd9c4, var(--accent) 65%);
+  animation: orbBreathe 1.6s ease-in-out infinite;
+}
+@keyframes orbBreathe { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.8); opacity: .65; } }
 .status-shimmer {
   font-size: var(--fs-md); font-weight: 550;
   background: linear-gradient(100deg, var(--text-faint) 35%, var(--accent-hover) 50%, var(--text-faint) 65%);
   background-size: 220% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: shimmer 2.1s linear infinite;
 }
+.status-target { font-family: var(--mono); font-size: var(--fs-sm); }
+.status-elapsed { color: var(--text-faint); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
 @keyframes shimmer { to { background-position: -220% 0; } }
+
+/* ─── End-of-turn receipt chip ─── */
+.done-chip {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+  color: var(--text-faint); font-size: var(--fs-sm); padding: 4px 2px;
+  font-variant-numeric: tabular-nums; animation: rowIn .3s ease both;
+}
+.dc-tick { color: var(--accent); display: inline-flex; }
+
+/* ─── Streaming word fade (spans mount per appended word) ─── */
+.wfade { opacity: 0; animation: wfade .35s ease forwards; }
+@keyframes wfade { to { opacity: 1; } }
+
+/* ─── Post-turn folded steps drawer ─── */
+.steps { width: 100%; }
+.steps-head {
+  background: none; border: none; color: var(--text-faint); font-size: var(--fs-md);
+  padding: 4px 2px; display: flex; align-items: center; gap: 7px;
+}
+.steps-head:hover { color: var(--text-dim); }
+.steps-tick { color: var(--accent); display: inline-flex; }
+.steps-n { color: var(--text-faint); }
+.steps-head .chev { display: inline-flex; align-items: center; transition: transform .25s ease; }
+.steps.open .steps-head .chev { transform: rotate(180deg); }
+.steps-body { margin-top: 2px; padding-left: 8px; border-left: 2px solid var(--border); }
 
 /* ─── Home → chat content swap ─── */
 .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -714,7 +808,7 @@ select.fld { appearance: none; }
 
 /* glass on overlays + floating menus */
 .modal-backdrop { background: rgba(0,0,0,.4); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.perm-modal, .settings, .cmdk, .cpop, .model-menu, .recent-menu {
+.perm-modal, .settings, .cmdk, .cpop, .model-menu, .recent-menu, .account-menu {
   background: var(--glass-strong); backdrop-filter: blur(34px) saturate(1.4); -webkit-backdrop-filter: blur(34px) saturate(1.4);
   border-color: var(--hair); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 24px 70px rgba(0,0,0,.55);
 }

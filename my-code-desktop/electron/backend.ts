@@ -92,11 +92,11 @@ export class Backend {
       const onFail = (msg: string) => reject(new Error(msg));
 
       child.on("error", (e) => {
-        if (!this.disposed) onFail(`failed to spawn my-code: ${e.message}`);
+        if (!this.disposed) onFail(`failed to start the backend: ${e.message}`);
       });
       child.on("exit", (code) => {
         if (this.disposed) return; // intentional stop() — not a crash
-        if (!this.handshake) onFail(`my-code serve exited early (code ${code})`);
+        if (!this.handshake) onFail(`the backend exited early (code ${code})`);
         else this.opts.onEvent({ type: "backend_error", message: `backend exited (code ${code})` });
       });
 

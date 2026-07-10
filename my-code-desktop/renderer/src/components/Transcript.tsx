@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Markdown } from "../Markdown";
-import { ToolCard } from "./ToolCard";
-import { Logo } from "./Logo";
+import { ToolCard, fmtDur } from "./ToolCard";
 import { Icon, type IconName } from "./Icon";
-import type { Item } from "../transcript";
+import type { Activity, Item, TurnReceipt } from "../transcript";
 import type { Mode } from "../../../electron/ipc";
 
 export interface TranscriptProps {
@@ -11,6 +10,12 @@ export interface TranscriptProps {
   mode: Mode;
   busy: boolean;
   mood: string;
+  /** What the agent is doing right now (drives the live status line). */
+  activity: Activity | null;
+  /** Wall-clock start of the current turn (drives the elapsed counter). */
+  turnStart: number | null;
+  /** End-of-turn receipt, shown once the turn completes. */
+  receipt: TurnReceipt | null;
   greeting: string;
   /** Resend the last user prompt. */
   onRetry: () => void;
@@ -22,7 +27,7 @@ export interface TranscriptProps {
   onOpenSettings: () => void;
 }
 
-export function Transcript({ items, busy, mood, onRetry, onRetryBackend, onEdit, onOpenSettings }: TranscriptProps): React.ReactElement {
+export function Transcript({ items, busy, activity, turnStart, receipt, onRetry, onRetryBackend, onEdit, onOpenSettings }: TranscriptProps): React.ReactElement {
   const endRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const prevLen = useRef(0);
@@ -40,7 +45,7 @@ export function Transcript({ items, busy, mood, onRetry, onRetryBackend, onEdit,
       endRef.current?.scrollIntoView({ block: "end", behavior: isNewItem ? "smooth" : "auto" });
     }
     prevLen.current = items.length;
-  }, [items]);
+  }, [items, activity, receipt]);
 
   return (
     <div className="transcript" ref={scrollRef}>
@@ -48,10 +53,14 @@ export function Transcript({ items, busy, mood, onRetry, onRetryBackend, onEdit,
         {items.map((it) => (
           <Row key={it.id} it={it} onRetry={onRetry} onRetryBackend={onRetryBackend} onEdit={onEdit} onOpenSettings={onOpenSettings} />
         ))}
-        {busy && mood === "thinking" && (
-          <div className="status-line">
-            <Logo size={22} mood="thinking" />
-            <span className="status-shimmer">Thinking…</span>
+        {busy && activity && <StatusLine activity={activity} turnStart={turnStart} />}
+        {!busy && receipt && (
+          <div className="done-chip">
+            <span className="dc-tick"><Icon name="check" size={12} /></span>
+            Done
+            {receipt.steps > 0 && <> · {receipt.steps} step{receipt.steps === 1 ? "" : "s"}</>}
+            {" · "}{fmtDur(receipt.durationMs)}
+            {receipt.tokens ? <> · {fmtTokens(receipt.tokens)} tokens</> : null}
           </div>
         )}
         <div ref={endRef} />
@@ -89,8 +98,8 @@ const Row = React.memo(function Row({ it, onRetry, onRetryBackend, onEdit, onOpe
     case "assistant":
       return (
         <div className="row assistant">
-          <div className="bubble assistant-bubble">
-            <Markdown content={it.text} />
+          <div className={`bubble assistant-bubble ${it.streaming ? "streaming" : ""}`}>
+            <Markdown content={it.text} streaming={it.streaming} />
             {it.streaming && <span className="caret" />}
           </div>
           <div className="msg-actions">
@@ -104,13 +113,15 @@ const Row = React.memo(function Row({ it, onRetry, onRetryBackend, onEdit, onOpe
         </div>
       );
     case "thinking":
-      return <ThinkingBlock text={it.text} streaming={it.streaming} durationMs={it.durationMs} />;
+      return <ThinkingBlock text={it.text} streaming={it.streaming} startedAt={it.startedAt} durationMs={it.durationMs} />;
     case "tool":
       return (
         <div className="row assistant">
           <ToolCard it={it} />
         </div>
       );
+    case "steps":
+      return <StepsDrawer tools={it.tools} durationMs={it.durationMs} />;
     case "notice":
       return <NoticeCard it={it} onRetry={onRetryBackend} onOpenSettings={onOpenSettings} />;
     default:
@@ -192,28 +203,96 @@ function NoticeCard({
 function ThinkingBlock({
   text,
   streaming,
+  startedAt,
   durationMs,
 }: {
   text: string;
   streaming: boolean;
+  startedAt?: number;
   durationMs?: number;
 }): React.ReactElement {
   const [open, setOpen] = useState(false);
+  const elapsed = useElapsed(streaming ? startedAt ?? null : null);
   const label = streaming
     ? "Thinking…"
     : durationMs
-      ? `Thought for ${(durationMs / 1000).toFixed(0)}s`
+      ? `Thought for ${fmtDur(durationMs)}`
       : "Thought";
+  // Live preview: the last non-empty reasoning line, ghosting under the label.
+  const preview = streaming ? lastLine(text) : "";
   return (
     <div className="row assistant">
       <div className={`thinking ${open ? "open" : ""}`}>
         <button className={`thinking-head ${streaming ? "live" : ""}`} onClick={() => setOpen((o) => !o)}>
           <span className="spark"><Icon name="sparkle" size={13} /></span>
           <span className="lab">{label}</span>
+          {streaming && elapsed !== null && <span className="think-elapsed">{fmtDur(elapsed)}</span>}
           <span className="chev"><Icon name="chevronDown" size={13} /></span>
         </button>
+        {preview && !open && <div className="think-preview">…{preview}</div>}
         <div className="thinking-wrap"><div className="thinking-body">{text}</div></div>
       </div>
     </div>
   );
+}
+
+function lastLine(text: string): string {
+  const lines = text.split("\n");
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const l = lines[i].trim();
+    if (l) return l.length > 140 ? l.slice(-140) : l;
+  }
+  return "";
+}
+
+/** Ticks ~4×/s while `since` is set; returns elapsed ms or null when idle. */
+function useElapsed(since: number | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (since === null) return;
+    const iv = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(iv);
+  }, [since]);
+  return since === null ? null : Math.max(0, now - since);
+}
+
+/** Live status line: breathing orb + shimmering activity verb + elapsed. */
+function StatusLine({ activity, turnStart }: { activity: Activity; turnStart: number | null }): React.ReactElement {
+  const elapsed = useElapsed(turnStart);
+  return (
+    <div className="status-line">
+      <span className="status-orb" aria-hidden="true" />
+      <span className="status-shimmer">
+        {activity.verb}
+        {activity.target && <span className="status-target"> {activity.target}</span>}…
+      </span>
+      {elapsed !== null && elapsed > 900 && <span className="status-elapsed">{fmtDur(elapsed)}</span>}
+    </div>
+  );
+}
+
+/** Folded post-turn drawer: "Worked for 14s · 4 steps" → full tool cards. */
+function StepsDrawer({ tools, durationMs }: { tools: Extract<Item, { kind: "tool" }>[]; durationMs: number }): React.ReactElement {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="row assistant">
+      <div className={`steps ${open ? "open" : ""}`}>
+        <button className="steps-head" onClick={() => setOpen((o) => !o)}>
+          <span className="steps-tick"><Icon name="check" size={13} /></span>
+          {durationMs > 0 ? `Worked for ${fmtDur(durationMs)}` : `Ran ${tools.length} steps`}
+          {durationMs > 0 && <span className="steps-n">· {tools.length} steps</span>}
+          <span className="chev"><Icon name="chevronDown" size={13} /></span>
+        </button>
+        {open && (
+          <div className="steps-body">
+            {tools.map((t) => <ToolCard key={t.id} it={t} />)}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function fmtTokens(n: number): string {
+  return n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, "") + "k" : String(n);
 }

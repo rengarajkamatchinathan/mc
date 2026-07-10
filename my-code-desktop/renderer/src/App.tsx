@@ -14,7 +14,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Composer } from "./components/Composer";
 import { Transcript } from "./components/Transcript";
 import { PermissionModal } from "./components/PermissionModal";
-import { Settings } from "./components/Settings";
+import { Settings, type SettingsSection } from "./components/Settings";
 import { Logo, type MascotMood } from "./components/Logo";
 import { Icon, type IconName } from "./components/Icon";
 import { TurnHud } from "./components/TurnHud";
@@ -28,7 +28,7 @@ import type {
   PermissionChoice,
   SessionMeta,
 } from "../../electron/ipc";
-import type { Item, PendingPermission } from "./transcript";
+import type { Activity, Item, PendingPermission, ToolItem, TurnReceipt } from "./transcript";
 
 let _seq = 0;
 const newId = () => `i${(_seq++).toString(36)}`;
@@ -43,9 +43,13 @@ export function App(): React.ReactElement {
   const [perm, setPerm] = useState<PendingPermission | null>(null);
   const [tokens, setTokens] = useState<{ prompt?: number; completion?: number }>({});
   const [turnStart, setTurnStart] = useState<number | null>(null);
+  const [activity, setActivity] = useState<Activity | null>(null);
+  const [receipt, setReceipt] = useState<TurnReceipt | null>(null);
+  const turnStartRef = useRef<number | null>(null);
+  const tokensRef = useRef<number | undefined>(undefined);
   const [convTitle, setConvTitle] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [cmdkOpen, setCmdkOpen] = useState(false);
   const [preferredName, setPreferredName] = useState<string>("");
   const [seed, setSeed] = useState<string>("");
@@ -88,20 +92,26 @@ export function App(): React.ReactElement {
           return;
         case "turn_start":
           setTurnStart(Date.now());
+          turnStartRef.current = Date.now();
+          setReceipt(null);
+          setActivity({ verb: "Thinking" });
           return;
         case "assistant_delta":
+          setActivity(null); // visible streaming text IS the status
           setItems((xs) => appendAssistant(xs, ev.text));
           return;
         case "assistant_done":
           setItems((xs) => finalizeAssistant(xs, ev.text));
           return;
         case "reasoning_delta":
+          setActivity((a) => (a?.verb === "Thinking" ? a : { verb: "Thinking" }));
           setItems((xs) => appendThinking(xs, ev.text));
           return;
         case "reasoning_done":
           setItems((xs) => finalizeThinking(xs, ev.durationMs));
           return;
         case "tool_start":
+          setActivity(activityFor(ev.name, ev.args));
           setItems((xs) => [
             ...xs,
             {
@@ -111,6 +121,7 @@ export function App(): React.ReactElement {
               name: ev.name,
               args: ev.args,
               running: true,
+              startedAt: Date.now(),
             },
           ]);
           return;
@@ -129,6 +140,7 @@ export function App(): React.ReactElement {
           return;
         case "token_stats":
           setTokens({ prompt: ev.promptTokens, completion: ev.completionTokens });
+          tokensRef.current = ev.completionTokens;
           return;
         case "notice":
           setItems((xs) => [...xs, { kind: "notice", id: newId(), tone: ev.tone, text: ev.message }]);
@@ -140,13 +152,25 @@ export function App(): React.ReactElement {
           setItems((xs) => [...xs, { kind: "notice", id: newId(), tone: "error", text: ev.message }]);
           setBusy(false);
           setMood("idle");
+          setActivity(null);
           return;
-        case "turn_end":
-          setItems((xs) => clearStreaming(xs));
+        case "turn_end": {
+          // Receipt before folding: count this turn's tool calls (incl. already-run tools).
+          const turnItems = itemsSinceLastUser(itemsRef.current);
+          const steps = turnItems.reduce(
+            (n, it) => n + (it.kind === "tool" ? 1 : it.kind === "steps" ? it.tools.length : 0),
+            0
+          );
+          if (turnStartRef.current) {
+            setReceipt({ durationMs: Date.now() - turnStartRef.current, steps, tokens: tokensRef.current });
+          }
+          setItems((xs) => foldToolRuns(clearStreaming(xs)));
           setBusy(false);
           setMood("idle");
+          setActivity(null);
           refreshSessions();
           return;
+        }
       }
     });
   }, [refreshSessions]);
@@ -165,14 +189,18 @@ export function App(): React.ReactElement {
       setTokens({});
       setSeed("");
       setTurnStart(null);
+      setActivity(null);
+      setReceipt(null);
     });
   }, []);
 
   // Replay a resumed session's stored messages into the transcript.
   useEffect(() => {
     return window.mycode.onLoadTranscript((messages) => {
-      setItems(historyToItems(messages));
+      setItems(foldToolRuns(historyToItems(messages)));
       setTurnStart(null);
+      setActivity(null);
+      setReceipt(null);
     });
   }, []);
 
@@ -198,7 +226,7 @@ export function App(): React.ReactElement {
     }
   }, []);
   const onEditMsg = useCallback((text: string) => setSeed(text + " "), []);
-  const onOpenSettingsCb = useCallback(() => setSettingsOpen(true), []);
+  const onOpenSettingsCb = useCallback(() => setSettingsSection("general"), []);
 
   // Error-card Retry. A "Something went wrong" card usually means the serve
   // process is dead — resending a prompt into a dead bridge vanishes silently.
@@ -293,7 +321,7 @@ export function App(): React.ReactElement {
   const commands: Command[] = [
     { id: "new", label: `New ${mode === "code" ? "task" : "chat"}`, run: () => void newChat() },
     { id: "mode", label: mode === "code" ? "Switch to Chat mode" : "Switch to Code mode", run: () => void switchMode(mode === "code" ? "chat" : "code") },
-    { id: "settings", label: "Open settings", run: () => setSettingsOpen(true) },
+    { id: "settings", label: "Open settings", run: () => setSettingsSection("general") },
     ...sessions.slice(0, 6).map((s) => ({
       id: s.id,
       label: `Open: ${s.firstPrompt ?? s.id}`,
@@ -311,7 +339,7 @@ export function App(): React.ReactElement {
       <TitleBar
         mode={mode}
         onMode={switchMode}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenSettings={() => setSettingsSection("general")}
         onOpenCommand={() => setCmdkOpen(true)}
         mood={busy ? (mood as MascotMood) : undefined}
       />
@@ -326,7 +354,7 @@ export function App(): React.ReactElement {
           onResume={resume}
           onRename={renameSession}
           onDelete={deleteSession}
-          onOpenSettings={() => setSettingsOpen(true)}
+          onOpenSettings={(section) => setSettingsSection(section ?? "general")}
         />
         <main className="main">
           <div className="main-head">
@@ -386,6 +414,9 @@ export function App(): React.ReactElement {
                   mode={mode}
                   busy={busy}
                   mood={mood}
+                  activity={activity}
+                  turnStart={turnStart}
+                  receipt={receipt}
                   greeting={preferredName}
                   onRetry={onRetry}
                   onRetryBackend={onRetryBackend}
@@ -409,7 +440,7 @@ export function App(): React.ReactElement {
         </main>
       </div>
       {perm && <PermissionModal req={perm} cwd={boot?.cwd ?? null} onAnswer={answer} />}
-      {settingsOpen && <Settings onClose={() => { setSettingsOpen(false); syncAppearance(); }} />}
+      {settingsSection && <Settings initialSection={settingsSection} onClose={() => { setSettingsSection(null); syncAppearance(); }} />}
       <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} commands={commands} />
     </div>
   );
@@ -436,7 +467,7 @@ function appendThinking(xs: Item[], text: string): Item[] {
   if (last?.kind === "thinking" && last.streaming) {
     return [...xs.slice(0, -1), { ...last, text: last.text + text }];
   }
-  return [...xs, { kind: "thinking", id: newId(), text, streaming: true }];
+  return [...xs, { kind: "thinking", id: newId(), text, streaming: true, startedAt: Date.now() }];
 }
 function finalizeThinking(xs: Item[], durationMs: number): Item[] {
   const last = xs[xs.length - 1];
@@ -451,6 +482,7 @@ function resolveTool(xs: Item[], ev: Extract<EngineEvent, { type: "tool_result" 
       ? {
           ...it,
           running: false,
+          durationMs: it.startedAt ? Date.now() - it.startedAt : undefined,
           result: ev.result,
           isError: ev.isError,
           diff: ev.diff,
@@ -458,6 +490,60 @@ function resolveTool(xs: Item[], ev: Extract<EngineEvent, { type: "tool_result" 
         }
       : it
   );
+}
+
+/** Everything after (not including) the last user message — the current turn. */
+function itemsSinceLastUser(xs: Item[]): Item[] {
+  for (let i = xs.length - 1; i >= 0; i--) {
+    if (xs[i].kind === "user") return xs.slice(i + 1);
+  }
+  return xs;
+}
+
+/**
+ * Fold runs of ≥2 consecutive finished tool cards into one "steps" drawer so a
+ * tool-heavy turn collapses to a single line once it's over. Existing drawers
+ * and everything else pass through untouched.
+ */
+function foldToolRuns(xs: Item[]): Item[] {
+  const out: Item[] = [];
+  let run: ToolItem[] = [];
+  const flush = () => {
+    if (run.length >= 2 && !run.some((t) => t.isError)) {
+      out.push({
+        kind: "steps",
+        id: newId(),
+        tools: run,
+        durationMs: run.reduce((s, t) => s + (t.durationMs ?? 0), 0),
+      });
+    } else {
+      out.push(...run);
+    }
+    run = [];
+  };
+  for (const it of xs) {
+    if (it.kind === "tool" && !it.running) run.push(it);
+    else {
+      flush();
+      out.push(it);
+    }
+  }
+  flush();
+  return out;
+}
+
+/** Map a tool call to the live status verb ("Reading backend.ts…"). */
+function activityFor(name: string, args: Record<string, unknown>): Activity {
+  const n = name.toLowerCase();
+  const a = args as Record<string, string>;
+  const base = (p?: string) => (p ? p.toString().split(/[\\/]/).pop() : undefined);
+  if (/(read|view|cat|open)/.test(n)) return { verb: "Reading", target: base(a.file_path ?? a.path) };
+  if (/(edit|write|multiedit|patch|apply)/.test(n)) return { verb: "Editing", target: base(a.file_path ?? a.path) };
+  if (/(bash|shell|powershell|pwsh|exec|command)/.test(n)) return { verb: "Running command" };
+  if (/(grep|glob|search|find)/.test(n)) return { verb: "Searching", target: a.pattern ?? a.query };
+  if (/(webfetch|websearch|web|fetch|http|browse)/.test(n)) return { verb: "Browsing", target: a.url ?? a.query };
+  if (/^task|agent/.test(n)) return { verb: "Delegating" };
+  return { verb: `Using ${name}` };
 }
 function clearStreaming(xs: Item[]): Item[] {
   return xs.map((it) => {

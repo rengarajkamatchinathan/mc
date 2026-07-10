@@ -1,0 +1,396 @@
+<title>my-code — Chat UX redesign preview</title>
+<style>
+  /* Deliberately single-theme: this is a 1:1 preview of my-code's dark shell. */
+  :root, :root[data-theme="light"], :root[data-theme="dark"] {
+    --bg: #100f0e;
+    --bg-pane: #161514;
+    --bg-elev: #201f1d;
+    --bg-input: #1a1918;
+    --glass: rgba(32,31,29,.72);
+    --hair: rgba(255,255,255,.09);
+    --border: #2c2b28;
+    --text: #e9e7e2;
+    --text-dim: #b4b1aa;
+    --text-faint: #7d7a73;
+    --accent: #4ec98a;
+    --accent-dim: rgba(78,201,138,.14);
+    --del: #f85149;
+    --del-dim: rgba(248,81,73,.12);
+    --warn: #d8a03d;
+    --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --r: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background:
+      radial-gradient(90rem 40rem at 70% -10%, rgba(78,201,138,.05), transparent 60%),
+      var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.55;
+    padding: 40px 20px 80px;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; }
+
+  /* ── page header ── */
+  .page-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  h1 { font-size: 21px; font-weight: 650; margin: 0; letter-spacing: -.01em; }
+  .page-sub { color: var(--text-faint); font-size: 13px; margin: 0 0 26px; max-width: 62ch; }
+  .eyebrow { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); font-weight: 600; }
+
+  h2 { font-size: 12px; letter-spacing: .09em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; margin: 44px 0 6px; }
+  .h2-note { color: var(--text-faint); font-size: 12.5px; margin: 0 0 14px; max-width: 68ch; }
+  .h2-note b { color: var(--text-dim); font-weight: 600; }
+
+  /* ── chat pane frame ── */
+  .pane {
+    background: var(--bg-pane);
+    border: 1px solid var(--hair);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 24px 60px rgba(0,0,0,.5);
+    overflow: hidden;
+  }
+  .pane-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 14px; border-bottom: 1px solid var(--hair);
+    background: var(--glass);
+  }
+  .pane-bar .dots { display: flex; gap: 6px; }
+  .pane-bar .dots i { width: 10px; height: 10px; border-radius: 50%; background: #3a3936; }
+  .pane-bar .t { font-size: 12px; color: var(--text-faint); margin-left: 6px; }
+  .replay {
+    margin-left: auto;
+    background: var(--accent-dim); color: var(--accent);
+    border: 1px solid rgba(78,201,138,.3); border-radius: 8px;
+    font: 600 12px var(--sans); padding: 5px 12px; cursor: pointer;
+  }
+  .replay:hover { background: rgba(78,201,138,.22); }
+  .replay:focus-visible, .tool-head:focus-visible, .think-head:focus-visible, .steps-head:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  .thread { padding: 22px 22px 26px; min-height: 430px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* ── messages ── */
+  .msg-user { align-self: flex-end; max-width: 78%; background: var(--bg-elev); border: 1px solid var(--hair); border-radius: 14px 14px 4px 14px; padding: 9px 13px; }
+  .msg-ai { max-width: 92%; padding: 2px 2px 0; }
+  .msg-ai p { margin: 0 0 10px; }
+  .msg-ai code { font-family: var(--mono); font-size: 12.5px; background: var(--bg-elev); border: 1px solid var(--hair); border-radius: 5px; padding: 1px 5px; }
+  .w { opacity: 0; display: inline; animation: wfade .3s ease forwards; }
+  @keyframes wfade { to { opacity: 1; } }
+  .caret { display: inline-block; width: 7px; height: 15px; background: var(--accent); border-radius: 2px; vertical-align: -2px; margin-left: 2px; animation: blink 1s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ── live status line (activity verbs + elapsed) ── */
+  .status { display: flex; align-items: center; gap: 9px; color: var(--text-dim); font-size: 13px; min-height: 22px; }
+  .status .orb { width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #8ee9bd, var(--accent) 60%, #1d7a4e); animation: orb 1.6s ease-in-out infinite; flex: 0 0 14px; }
+  @keyframes orb { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.82); opacity: .7; } }
+  .status .verb { background: linear-gradient(90deg, var(--text-dim) 30%, #fff 50%, var(--text-dim) 70%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.8s linear infinite; font-weight: 550; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .status .elapsed { color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .status .verb .tgt { font-family: var(--mono); font-size: 12px; }
+
+  /* ── thinking card ── */
+  .think { border: 1px solid var(--hair); background: var(--glass); border-radius: var(--r); overflow: hidden; max-width: 92%; }
+  .think-head { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none; color: var(--text-dim); font: 550 13px var(--sans); padding: 9px 12px; cursor: pointer; }
+  .think .spark { color: var(--accent); display: inline-flex; }
+  .think.live .lab { background: linear-gradient(90deg, var(--text-dim) 30%, #fff 50%, var(--text-dim) 70%); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 1.8s linear infinite; }
+  .think .dur { margin-left: auto; color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .think .chev { color: var(--text-faint); transition: transform .18s; display: inline-flex; }
+  .think.open .chev { transform: rotate(180deg); }
+  .think-preview { padding: 0 12px 9px 32px; color: var(--text-faint); font-size: 12.5px; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; mask-image: linear-gradient(90deg, #000 78%, transparent); -webkit-mask-image: linear-gradient(90deg, #000 78%, transparent); }
+  .think-body { display: none; padding: 2px 14px 12px 32px; color: var(--text-dim); font-size: 12.5px; border-top: 1px dashed var(--hair); margin-top: 2px; padding-top: 10px; }
+  .think.open .think-body { display: block; }
+  .think.open .think-preview { display: none; }
+
+  /* ── tool cards ── */
+  .tool { border: 1px solid var(--hair); background: var(--glass); border-radius: var(--r); overflow: hidden; max-width: 92%; transition: border-color .25s; }
+  .tool.running { border-color: rgba(78,201,138,.35); animation: pulseb 2s ease-in-out infinite; }
+  @keyframes pulseb { 50% { border-color: rgba(78,201,138,.14); } }
+  .tool.error { border-color: rgba(248,81,73,.4); }
+  .tool-head { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; color: var(--text); font: 550 13px var(--sans); padding: 8px 12px; cursor: pointer; }
+  .tile { width: 22px; height: 22px; border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; font-size: 12px; }
+  .t-read  { background: rgba(96,165,250,.15); color: #7cb4f7; }
+  .t-bash  { background: rgba(190,160,255,.14); color: #c0a5f5; }
+  .t-edit  { background: rgba(78,201,138,.15); color: var(--accent); }
+  .t-err   { background: var(--del-dim); color: var(--del); }
+  .tool-name { font-weight: 600; }
+  .tool-sum { color: var(--text-faint); font-family: var(--mono); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tool-metric { margin-left: auto; color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+  .ok-ic { color: var(--accent); } .err-ic { color: var(--del); }
+  .spin { width: 12px; height: 12px; border: 2px solid rgba(78,201,138,.25); border-top-color: var(--accent); border-radius: 50%; animation: rot .7s linear infinite; }
+  @keyframes rot { to { transform: rotate(360deg); } }
+  .tool .chev { color: var(--text-faint); transition: transform .18s; display: inline-flex; }
+  .tool.open .chev { transform: rotate(180deg); }
+  .tool-body { display: none; border-top: 1px solid var(--hair); }
+  .tool.open .tool-body, .tool.running .tool-body { display: block; }
+  .tool-args { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 9px 13px; border-bottom: 1px dashed var(--hair); }
+  .tool-args .k { color: var(--text-faint); }
+  .tool-out { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 9px 13px; margin: 0; white-space: pre-wrap; max-height: 150px; overflow: auto; }
+  .tool-out .dimline { color: var(--text-faint); }
+  .tool-out .redline { color: #f0857f; }
+
+  /* ── grouped steps drawer (turn end) ── */
+  .steps { border: 1px solid var(--hair); background: var(--glass); border-radius: var(--r); overflow: hidden; max-width: 92%; }
+  .steps-head { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; color: var(--text-dim); font: 550 13px var(--sans); padding: 9px 12px; cursor: pointer; }
+  .steps-head .n { color: var(--text-faint); font-weight: 500; }
+  .steps-head .chev { margin-left: auto; color: var(--text-faint); transition: transform .18s; display: inline-flex; }
+  .steps.open .chev { transform: rotate(180deg); }
+  .steps-body { display: none; border-top: 1px solid var(--hair); padding: 6px 8px; flex-direction: column; gap: 4px; }
+  .steps.open .steps-body { display: flex; }
+  .steps-body .tool { max-width: none; border: none; background: none; }
+  .step-row { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: 8px; font-size: 12.5px; color: var(--text-dim); }
+  .step-row:hover { background: var(--bg-elev); }
+  .step-row .m { margin-left: auto; color: var(--text-faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .step-rail { width: 22px; display: flex; justify-content: center; color: var(--text-faint); }
+
+  /* ── done chip ── */
+  .done-chip { display: inline-flex; align-items: center; gap: 7px; align-self: flex-start; color: var(--text-faint); font-size: 12px; padding: 3px 2px; font-variant-numeric: tabular-nums; }
+  .done-chip .tick { color: var(--accent); }
+
+  /* ── states gallery ── */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; }
+  .cell { background: var(--bg-pane); border: 1px solid var(--hair); border-radius: 14px; padding: 16px 16px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .cell .cap { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
+  .cell .why { color: var(--text-faint); font-size: 12px; margin: 2px 0 0; }
+  .cell .tool, .cell .think, .cell .steps { max-width: none; }
+
+  .foot { color: var(--text-faint); font-size: 12px; margin-top: 40px; border-top: 1px solid var(--hair); padding-top: 14px; max-width: 70ch; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .w { animation-duration: .01s; }
+    .status .verb, .think.live .lab { animation: none; color: var(--text-dim); background: none; }
+    .orb, .tool.running, .caret { animation: none; }
+  }
+</style>
+
+<div class="wrap">
+  <div class="eyebrow">Draft · Phase 1 + 2 preview</div>
+  <div class="page-head"><h1>my-code — chat turn, redesigned</h1></div>
+  <p class="page-sub">Interactive mockup in your app's shell. Press <b style="color:var(--text-dim)">Replay turn</b> to watch the full lifecycle: activity verbs with a live timer, thinking with a streaming preview, tools that run expanded and collapse to summaries, then a soft-fade answer and a turn receipt.</p>
+
+  <section class="pane" aria-label="Live demo">
+    <div class="pane-bar">
+      <span class="dots"><i></i><i></i><i></i></span>
+      <span class="t">Chat · gpt-5.2-synfra</span>
+      <button class="replay" id="replay">▶ Replay turn</button>
+    </div>
+    <div class="thread" id="thread"></div>
+  </section>
+
+  <h2>Component states</h2>
+  <p class="h2-note">Every state the reducer can produce, side by side. The core rule: <b>expanded while it matters, one quiet line once it doesn't.</b> Click any header — everything stays togglable after auto-collapse.</p>
+
+  <div class="gallery">
+    <div class="cell">
+      <span class="cap">Tool · running (auto-expanded)</span>
+      <div class="tool running">
+        <button class="tool-head"><span class="tile t-bash">❯</span><span class="tool-name">Bash</span><span class="tool-sum">bun run build</span><span class="tool-metric"><span class="spin"></span> 1.2s</span></button>
+        <div class="tool-body">
+          <div class="tool-args"><span class="k">$</span> bun run build 2&gt;&amp;1 | tail -5</div>
+          <pre class="tool-out"><span class="dimline">Bundled 551 modules in 52ms…</span></pre>
+        </div>
+      </div>
+      <p class="why">Live border pulse, spinner + elapsed in the corner, args always visible while running — no click needed to see what it's doing.</p>
+    </div>
+
+    <div class="cell">
+      <span class="cap">Tool · done (auto-collapsed summary)</span>
+      <div class="tool">
+        <button class="tool-head"><span class="tile t-read">◉</span><span class="tool-name">Read</span><span class="tool-sum">electron/backend.ts</span><span class="tool-metric"><span class="ok-ic">✓</span> 253 lines · 0.3s<span class="chev">⌄</span></span></button>
+      </div>
+      <div class="tool">
+        <button class="tool-head"><span class="tile t-edit">✎</span><span class="tool-name">Edit</span><span class="tool-sum">src/cli.ts</span><span class="tool-metric"><span class="ok-ic">✓</span> +9 −1 · 0.1s<span class="chev">⌄</span></span></button>
+      </div>
+      <p class="why">One line: what it touched + a result metric (lines read, diff size, exit code) + duration. Click re-expands.</p>
+    </div>
+
+    <div class="cell">
+      <span class="cap">Tool · error (stays expanded)</span>
+      <div class="tool error open">
+        <button class="tool-head"><span class="tile t-err">✕</span><span class="tool-name">Bash</span><span class="tool-sum">bun run typecheck</span><span class="tool-metric"><span class="err-ic">exit 2</span> · 4.1s<span class="chev">⌄</span></span></button>
+        <div class="tool-body">
+          <div class="tool-args"><span class="k">$</span> bun run typecheck</div>
+          <pre class="tool-out"><span class="redline">src/cli.ts(212,5): error TS2322: Type 'string'
+is not assignable to type 'ProviderName'.</span></pre>
+        </div>
+      </div>
+      <p class="why">Failures never hide behind a click — red border, exit code in the header, output already open.</p>
+    </div>
+
+    <div class="cell">
+      <span class="cap">Thinking · live vs. finished</span>
+      <div class="think live">
+        <button class="think-head"><span class="spark">✦</span><span class="lab">Thinking…</span><span class="dur">6s</span></button>
+        <div class="think-preview">…the build passes but the binary isn't on PATH, so the likely fix is a global link step…</div>
+      </div>
+      <div class="think">
+        <button class="think-head"><span class="spark">✦</span><span class="lab">Thought for 6s</span><span class="chev">⌄</span></button>
+      </div>
+      <p class="why">While live: shimmer label, counting timer, and the last reasoning line ghosting underneath — proof of life. Done: one quiet line.</p>
+    </div>
+
+    <div class="cell">
+      <span class="cap">Status line · activity verbs</span>
+      <div class="status"><span class="orb"></span><span class="verb">Thinking…</span><span class="elapsed">3s</span></div>
+      <div class="status"><span class="orb"></span><span class="verb">Reading <span class="tgt">backend.ts</span>…</span><span class="elapsed">12s</span></div>
+      <div class="status"><span class="orb"></span><span class="verb">Running command…</span><span class="elapsed">18s</span></div>
+      <p class="why">One line, derived from the latest event — replaces the frozen generic “Thinking…”. Disappears the moment text starts streaming.</p>
+    </div>
+
+    <div class="cell">
+      <span class="cap">Turn receipt · grouped steps (Phase 2)</span>
+      <div class="steps" id="g-steps">
+        <button class="steps-head"><span class="ok-ic">✓</span> Worked for 14s <span class="n">· 4 steps</span><span class="chev">⌄</span></button>
+        <div class="steps-body">
+          <div class="step-row"><span class="step-rail">◉</span> Read <span style="font-family:var(--mono);font-size:12px">package.json</span><span class="m">✓ 0.2s</span></div>
+          <div class="step-row"><span class="step-rail">❯</span> Bash <span style="font-family:var(--mono);font-size:12px">bun run build</span><span class="m">✓ 2.1s</span></div>
+          <div class="step-row"><span class="step-rail">❯</span> Bash <span style="font-family:var(--mono);font-size:12px">bun link</span><span class="m">✓ 0.6s</span></div>
+          <div class="step-row"><span class="step-rail">✎</span> Edit <span style="font-family:var(--mono);font-size:12px">package.json</span><span class="m">✓ +2 −0</span></div>
+        </div>
+      </div>
+      <p class="why">After the turn ends, consecutive tool cards fold into one drawer — the transcript stays readable, the detail stays reachable.</p>
+    </div>
+  </div>
+
+  <p class="foot">All of this is renderer-only — driven by the <code style="font-family:var(--mono)">tool_start / tool_result / reasoning_delta / state</code> events the bridge already sends. Live output tails inside a running Bash card (shown in the demo) are the one piece that needs a new <code style="font-family:var(--mono)">tool_output</code> event from the CLI (Phase 3).</p>
+</div>
+
+<script>
+(function () {
+  var thread = document.getElementById("thread");
+  var timers = [];
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function el(cls, html) { var d = document.createElement("div"); d.className = cls; if (html !== undefined) d.innerHTML = html; return d; }
+
+  // clickable expand/collapse for any card head
+  document.addEventListener("click", function (e) {
+    var head = e.target.closest(".tool-head, .think-head, .steps-head");
+    if (!head) return;
+    var card = head.parentElement;
+    if (card.classList.contains("running")) return;
+    card.classList.toggle("open");
+  });
+
+  function fmt(s) { return s < 60 ? s + "s" : Math.floor(s / 60) + "m " + (s % 60) + "s"; }
+
+  function play() {
+    timers.forEach(clearTimeout); timers = [];
+    thread.innerHTML = "";
+    var t = 0;
+
+    // user message
+    later(function () {
+      thread.appendChild(el("msg-user", "why does <code style='font-family:var(--mono);font-size:12.5px'>my-code</code> say command not found after I build it?"));
+    }, t); t += 500;
+
+    // status line + elapsed timer
+    var started;
+    var status = el("status");
+    status.innerHTML = '<span class="orb"></span><span class="verb">Thinking…</span><span class="elapsed">0s</span>';
+    later(function () {
+      thread.appendChild(status);
+      started = Date.now();
+      var iv = setInterval(function () {
+        var e = status.querySelector(".elapsed");
+        if (!e || !status.isConnected) { clearInterval(iv); return; }
+        e.textContent = fmt(Math.floor((Date.now() - started) / 1000));
+      }, 250);
+      timers.push(iv);
+    }, t); t += 700;
+
+    function verb(html) { later(function () { status.querySelector(".verb").innerHTML = html; }, t); }
+
+    // thinking card with live preview
+    var think = el("think live");
+    think.innerHTML = '<button class="think-head"><span class="spark">✦</span><span class="lab">Thinking…</span><span class="dur">0s</span></button><div class="think-preview"></div><div class="think-body">The build succeeded, so the binary exists in dist/. “command not found” therefore means PATH, not compilation. The package.json bin field maps my-code → dist/cli.js; nothing installed that mapping globally. bun link registers it into ~/.bun/bin, which is already on PATH.</div>';
+    var previews = [
+      "the build output exists, so this isn't a compile problem…",
+      "“command not found” means the shell can't resolve it from PATH…",
+      "package.json has a bin field — but nothing ever installed it globally…",
+      "bun link would register dist/cli.js into ~/.bun/bin…"
+    ];
+    later(function () { thread.insertBefore(think, status); }, t);
+    var thinkStart = t;
+    previews.forEach(function (p, i) {
+      later(function () {
+        think.querySelector(".think-preview").textContent = "…" + p;
+        think.querySelector(".dur").textContent = Math.round((i + 1) * 1.1) + "s";
+      }, t); t += 1100;
+    });
+    later(function () {
+      think.classList.remove("live");
+      think.querySelector(".lab").textContent = "Thought for " + Math.round((t - thinkStart) / 1000) + "s";
+      think.querySelector(".think-preview").remove();
+      think.querySelector(".think-head").insertAdjacentHTML("beforeend", '<span class="chev">⌄</span>');
+      think.querySelector(".dur").remove();
+    }, t); t += 250;
+
+    // tool 1: Read — runs expanded, collapses to summary
+    verb('Reading <span class="tgt">package.json</span>…');
+    var read = el("tool running");
+    read.innerHTML = '<button class="tool-head"><span class="tile t-read">◉</span><span class="tool-name">Read</span><span class="tool-sum">my-code/package.json</span><span class="tool-metric"><span class="spin"></span></span></button><div class="tool-body"><div class="tool-args"><span class="k">path:</span> my-code/package.json</div></div>';
+    later(function () { thread.insertBefore(read, status); }, t); t += 1300;
+    later(function () {
+      read.classList.remove("running");
+      read.querySelector(".tool-body").remove();
+      read.querySelector(".tool-metric").innerHTML = '<span class="ok-ic">✓</span> 58 lines · 0.3s<span class="chev">⌄</span>';
+      read.querySelector(".tool-body")?.remove();
+      read.dataset.body = "1";
+      var body = el("tool-body");
+      body.innerHTML = '<div class="tool-args"><span class="k">path:</span> my-code/package.json</div><pre class="tool-out">"bin": { "my-code": "./dist/cli.js" }</pre>';
+      read.appendChild(body);
+    }, t); t += 500;
+
+    // tool 2: Bash — live output tail, collapses
+    verb("Running command…");
+    var bash = el("tool running");
+    bash.innerHTML = '<button class="tool-head"><span class="tile t-bash">❯</span><span class="tool-name">Bash</span><span class="tool-sum">bun link</span><span class="tool-metric"><span class="spin"></span> <span class="bt">0.0s</span></span></button><div class="tool-body"><div class="tool-args"><span class="k">$</span> bun link &amp;&amp; which my-code</div><pre class="tool-out"></pre></div>';
+    later(function () { thread.insertBefore(bash, status); }, t);
+    var lines = ['<span class="dimline">bun link v1.3.13</span>', 'Success! Registered "my-code"', "/Users/admin/.bun/bin/my-code"];
+    lines.forEach(function (l, i) {
+      later(function () {
+        bash.querySelector(".tool-out").innerHTML += l + "\n";
+        bash.querySelector(".bt").textContent = ((i + 1) * 0.7).toFixed(1) + "s";
+      }, t + 500 + i * 700);
+    });
+    t += 500 + lines.length * 700 + 400;
+    later(function () {
+      bash.classList.remove("running");
+      bash.querySelector(".tool-metric").innerHTML = '<span class="ok-ic">✓</span> exit 0 · 2.1s<span class="chev">⌄</span>';
+    }, t); t += 400;
+
+    // streaming answer with word fade
+    later(function () { status.remove(); }, t);
+    var ans = el("msg-ai");
+    var p = document.createElement("p");
+    ans.appendChild(p);
+    later(function () { thread.appendChild(ans); }, t);
+    var words = "The build was fine — the binary just wasn't on your PATH. Your package.json maps the my-code command to dist/cli.js, but nothing installed that mapping globally. I ran bun link, which symlinked it into ~/.bun/bin, and verified the command now resolves. After future edits you only need to rebuild — the link stays.".split(" ");
+    var caret = document.createElement("span"); caret.className = "caret";
+    later(function () { p.appendChild(caret); }, t);
+    words.forEach(function (w) {
+      later(function () {
+        var s = document.createElement("span");
+        s.className = "w";
+        s.textContent = w + " ";
+        p.insertBefore(s, caret);
+        thread.scrollTop = thread.scrollHeight;
+      }, t); t += 46;
+    });
+    later(function () { caret.remove(); }, t); t += 300;
+
+    // turn receipt
+    later(function () {
+      var chip = el("done-chip");
+      chip.innerHTML = '<span class="tick">✓</span> Done · 2 steps · ' + fmt(Math.floor((Date.now() - started) / 1000)) + ' · 1.4k tokens';
+      thread.appendChild(chip);
+    }, t);
+  }
+
+  document.getElementById("replay").addEventListener("click", play);
+  play();
+})();
+</script>

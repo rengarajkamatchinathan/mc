@@ -613,6 +613,7 @@ function wireIpc(): void {
     await restartBackend();
     return bootstrapView();
   });
+  ipcMain.handle(IPC.getVersion, () => app.getVersion());
 
   // ── Settings: Permissions ──
   ipcMain.handle(IPC.getPermissions, async () => {
@@ -685,8 +686,12 @@ async function createWindow(): Promise<void> {
     backgroundMaterial: "mica",
     title: "my-code",
     icon: join(__dirname, "..", "..", "build", "icon.ico"),
-    frame: false,
-    titleBarStyle: "hidden",
+    // macOS: keep the NATIVE traffic lights (the renderer hides its CSS clones
+    // there) and center them in the 48px title bar. Elsewhere: fully frameless,
+    // with the renderer drawing its own window controls.
+    ...(process.platform === "darwin"
+      ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 16, y: 18 } }
+      : { frame: false }),
     webPreferences: {
       preload: join(__dirname, "../preload/index.js"),
       contextIsolation: true,
@@ -704,6 +709,8 @@ async function createWindow(): Promise<void> {
   if (devServer) await win.loadURL(devServer);
   else await win.loadFile(join(__dirname, "../renderer/index.html"));
 }
+
+app.setName("my-code"); // dock/notification label (packaged builds also get productName)
 
 app.whenReady().then(async () => {
   await loadPrefs();
