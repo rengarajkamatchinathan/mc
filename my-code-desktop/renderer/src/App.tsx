@@ -13,7 +13,7 @@ import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { Composer } from "./components/Composer";
 import { Transcript } from "./components/Transcript";
-import { PermissionModal } from "./components/PermissionModal";
+import { ApprovalDock } from "./components/ApprovalDock";
 import { Settings, type SettingsSection } from "./components/Settings";
 import { Logo, type MascotMood } from "./components/Logo";
 import { Icon, type IconName } from "./components/Icon";
@@ -423,6 +423,7 @@ export function App(): React.ReactElement {
                   onEdit={onEditMsg}
                   onOpenSettings={onOpenSettingsCb}
                 />
+                {perm && <ApprovalDock req={perm} cwd={boot?.cwd ?? null} onAnswer={answer} />}
                 <Composer
                   mode={mode}
                   model={boot?.model ?? "…"}
@@ -439,7 +440,6 @@ export function App(): React.ReactElement {
           </AnimatePresence>
         </main>
       </div>
-      {perm && <PermissionModal req={perm} cwd={boot?.cwd ?? null} onAnswer={answer} />}
       {settingsSection && <Settings initialSection={settingsSection} onClose={() => { setSettingsSection(null); syncAppearance(); }} />}
       <CommandPalette open={cmdkOpen} onClose={() => setCmdkOpen(false)} commands={commands} />
     </div>

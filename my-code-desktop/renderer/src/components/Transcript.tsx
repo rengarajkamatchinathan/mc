@@ -28,43 +28,127 @@ export interface TranscriptProps {
 }
 
 export function Transcript({ items, busy, activity, turnStart, receipt, onRetry, onRetryBackend, onEdit, onOpenSettings }: TranscriptProps): React.ReactElement {
-  const endRef = useRef<HTMLDivElement | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   const prevLen = useRef(0);
 
-  // Auto-scroll only when the user is already near the bottom, so scrolling up
-  // to read older messages during a stream doesn't yank the view back down.
-  // Smooth-scroll only when a *new* item arrives; token deltas jump instantly so
-  // rapid streaming never fights an in-flight smooth animation.
+  // Auto-follow state machine: stick to the bottom while streaming, break the
+  // instant the user scrolls up, re-engage when they come back down. `follow`
+  // and `programmatic` are refs so per-token scrolls never trigger re-renders;
+  // `detached`/`unread` are state because the jump button renders from them.
+  const followRef = useRef(true);
+  const programmaticRef = useRef(false);
+  const lastTopRef = useRef(0);
+  const [detached, setDetached] = useState(false);
+  const [unread, setUnread] = useState(0);
+
+  const scrollToBottom = (smooth: boolean) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    // Already at the bottom → scrollTo won't fire a scroll event, and the
+    // programmatic flag would stick on and swallow the user's next scroll.
+    if (el.scrollHeight - el.scrollTop - el.clientHeight <= 1) return;
+    programmaticRef.current = true;
+    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  };
+
+  const setFollow = (on: boolean) => {
+    followRef.current = on;
+    if (on) setUnread(0);
+  };
+
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-    if (nearBottom) {
-      const isNewItem = items.length !== prevLen.current;
-      endRef.current?.scrollIntoView({ block: "end", behavior: isNewItem ? "smooth" : "auto" });
-    }
+    lastTopRef.current = el.scrollTop;
+    // Wheel-up is unambiguous intent — break before the next token can snap
+    // the viewport back. It also clears `programmatic`: a wheel mid-smooth-
+    // scroll cancels the animation, so the flag would otherwise stick on.
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) { programmaticRef.current = false; setFollow(false); }
+    };
+    const onTouch = () => { programmaticRef.current = false; setFollow(false); };
+    // Direction-aware and deaf to our own scrolls: user moving up breaks
+    // follow (covers scrollbar drags and keyboard); only a *downward* landing
+    // near the bottom re-engages — never upward movement near the bottom,
+    // which is the tug-of-war that makes scrolling up mid-stream feel stuck.
+    const onScroll = () => {
+      const goingDown = el.scrollTop > lastTopRef.current;
+      lastTopRef.current = el.scrollTop;
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (programmaticRef.current) {
+        if (dist <= 1) { programmaticRef.current = false; setFollow(true); }
+      } else if (!goingDown && dist > 4) {
+        setFollow(false);
+      } else if (goingDown && dist < 40) {
+        setFollow(true);
+      }
+      setDetached(dist > 120);
+    };
+    el.addEventListener("wheel", onWheel, { passive: true });
+    el.addEventListener("touchmove", onTouch, { passive: true });
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("touchmove", onTouch);
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
+  // Follow content growth that doesn't change the item count — streaming
+  // markdown, tool cards expanding, images loading.
+  useEffect(() => {
+    const th = threadRef.current;
+    if (!th || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (followRef.current) scrollToBottom(false);
+    });
+    ro.observe(th);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const added = items.length - prevLen.current;
     prevLen.current = items.length;
+    // Sending a message always means "show me the reply" — resume following.
+    if (added > 0 && items[items.length - 1]?.kind === "user") setFollow(true);
+    if (followRef.current) {
+      // Smooth only for new items; token deltas jump instantly so rapid
+      // streaming never fights an in-flight smooth animation.
+      scrollToBottom(added > 0);
+    } else if (added > 0) {
+      setUnread((n) => n + added);
+    }
   }, [items, activity, receipt]);
 
   return (
-    <div className="transcript" ref={scrollRef}>
-      <div className="thread">
-        {items.map((it) => (
-          <Row key={it.id} it={it} onRetry={onRetry} onRetryBackend={onRetryBackend} onEdit={onEdit} onOpenSettings={onOpenSettings} />
-        ))}
-        {busy && activity && <StatusLine activity={activity} turnStart={turnStart} />}
-        {!busy && receipt && (
-          <div className="done-chip">
-            <span className="dc-tick"><Icon name="check" size={12} /></span>
-            Done
-            {receipt.steps > 0 && <> · {receipt.steps} step{receipt.steps === 1 ? "" : "s"}</>}
-            {" · "}{fmtDur(receipt.durationMs)}
-            {receipt.tokens ? <> · {fmtTokens(receipt.tokens)} tokens</> : null}
-          </div>
-        )}
-        <div ref={endRef} />
+    <div className="transcript-shell">
+      <div className="transcript" ref={scrollRef}>
+        <div className="thread" ref={threadRef}>
+          {items.map((it) => (
+            <Row key={it.id} it={it} onRetry={onRetry} onRetryBackend={onRetryBackend} onEdit={onEdit} onOpenSettings={onOpenSettings} />
+          ))}
+          {busy && activity && <StatusLine activity={activity} turnStart={turnStart} />}
+          {!busy && receipt && (
+            <div className="done-chip">
+              <span className="dc-tick"><Icon name="check" size={12} /></span>
+              Done
+              {receipt.steps > 0 && <> · {receipt.steps} step{receipt.steps === 1 ? "" : "s"}</>}
+              {" · "}{fmtDur(receipt.durationMs)}
+              {receipt.tokens ? <> · {fmtTokens(receipt.tokens)} tokens</> : null}
+            </div>
+          )}
+        </div>
       </div>
+      <button
+        className={`jump-bottom${detached ? " show" : ""}`}
+        aria-label="Scroll to bottom"
+        tabIndex={detached ? 0 : -1}
+        onClick={() => scrollToBottom(true)}
+      >
+        <Icon name="chevronDown" size={16} />
+        {unread > 0 && <span className="jump-badge">{unread > 9 ? "9+" : unread}</span>}
+      </button>
     </div>
   );
 }
