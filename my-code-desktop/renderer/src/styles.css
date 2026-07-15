@@ -654,28 +654,31 @@ select.fld { appearance: none; }
 /* Everything below animates transform/opacity only (compositor-friendly), and
    is silenced by the prefers-reduced-motion / .reduce-motion blocks above. */
 
-/* ─── Reactive Sentinel mascot ─── */
+/* ─── Reactive "/mc" mark ─── */
 .sentinel { position: relative; display: inline-flex; align-items: center; justify-content: center; }
-.sentinel .halo { position: absolute; inset: -26%; border-radius: 50%; background: radial-gradient(circle, #37dbd0, transparent 65%); filter: blur(9px); opacity: 0; transition: opacity .5s ease; pointer-events: none; }
+.sentinel .halo { position: absolute; inset: -26%; border-radius: 50%; background: radial-gradient(circle, #d97757, transparent 65%); filter: blur(9px); opacity: 0; transition: opacity .5s ease; pointer-events: none; }
 .sentinel > svg { position: relative; z-index: 1; display: block; }
-.mc-eye { transform-box: fill-box; transform-origin: center; transition: fill .3s ease; }
-.mc-eyes { transform-box: fill-box; transform-origin: center; }
-/* idle — slow breathing + occasional blink */
+.mc-slash { transform-box: fill-box; transform-origin: center; transition: fill .3s ease, stroke .3s ease; }
+.mc-letters { transition: fill .3s ease, stroke .3s ease; }
+/* idle — slow breathing, slash pulses like a resting cursor */
 .sentinel-idle > svg { animation: breathe 4.5s ease-in-out infinite; }
-.sentinel-idle .mc-eye { animation: blinkEye 4.8s ease-in-out infinite; }
+.sentinel-idle .mc-slash { animation: slashPulse 4.8s ease-in-out infinite; }
 @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.035); } }
-@keyframes blinkEye { 0%,42%,48%,100% { transform: scaleY(1); } 45% { transform: scaleY(.12); } }
-/* thinking / tool — glow halo pulse + eyes scan, quicker breathing */
-.sentinel-thinking .halo, .sentinel-tool .halo { opacity: .55; animation: haloPulse 1.5s ease-in-out infinite; }
+@keyframes slashPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+/* thinking / tool — halo pulse + the slash tick-rotates like the ASCII
+   spinner (| / - \); tool is the fast one */
+.sentinel-thinking .halo, .sentinel-tool .halo { opacity: .5; animation: haloPulse 1.5s ease-in-out infinite; }
 @keyframes haloPulse { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
-.sentinel-thinking .mc-eyes, .sentinel-tool .mc-eyes { animation: scan 1.4s ease-in-out infinite; }
-@keyframes scan { 0%,100% { transform: translateX(-3px); } 50% { transform: translateX(3px); } }
-.sentinel-thinking > svg, .sentinel-tool > svg { animation: breathe 2s ease-in-out infinite; }
-/* streaming — steady bright glow */
-.sentinel-streaming .halo { opacity: .4; }
-.sentinel-streaming .mc-eye { fill: #7ff6ec; }
-/* error — red flash */
-.sentinel-error .mc-eye { fill: var(--del); }
+.sentinel-thinking .mc-slash { animation: slashSpin 1.6s steps(8, end) infinite; }
+.sentinel-tool .mc-slash { animation: slashSpin .6s steps(8, end) infinite; }
+@keyframes slashSpin { to { transform: rotate(360deg); } }
+/* streaming — the slash warms up */
+.sentinel-streaming .halo { opacity: .35; }
+.sentinel-streaming .mc-slash { fill: #ff9066; stroke: #ff9066; }
+/* error — mark goes red with a hard strobe */
+.sentinel-error .mc-slash, .sentinel-error .mc-letters { fill: var(--del); stroke: var(--del); }
+.sentinel-error > svg { animation: errFlash .55s steps(2, end) infinite; }
+@keyframes errFlash { 50% { opacity: .45; } }
 .sentinel-error .halo { opacity: .5; background: radial-gradient(circle, var(--del), transparent 65%); }
 
 /* ─── Live status line: breathing orb + activity verb + elapsed ─── */
@@ -891,8 +894,8 @@ select.fld { appearance: none; }
 .tool-card:hover { box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 22px -10px rgba(0,0,0,.55); border-color: rgba(255,255,255,.12); }
 .row:hover .user-bubble { box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 8px 22px -10px rgba(0,0,0,.5); }
 
-/* glowing Sentinel mascot */
-.sentinel > svg { filter: drop-shadow(0 3px 10px rgba(0,0,0,.4)) drop-shadow(0 0 8px rgba(55,219,208,.28)); }
+/* glowing /mc mark */
+.sentinel > svg { filter: drop-shadow(0 3px 10px rgba(0,0,0,.4)) drop-shadow(0 0 8px rgba(217,119,87,.28)); }
 .sentinel-idle .halo { opacity: .26; }
 
 /* composer animated gradient focus ring */

@@ -1,20 +1,35 @@
-import React, { useId } from "react";
+import React from "react";
 
-/** Reactive states that drive the mascot's eyes, glow halo, and breathing. */
+/** Reactive states that drive the /mc mark's slash spinner, glow, and breathing. */
 export type MascotMood = "idle" | "thinking" | "streaming" | "tool" | "error";
 
 /**
- * The my-code "Sentinel" mark — a cyber-dog head in a terracotta helmet wearing
- * over-ear headphones: a contained visor band with a glowing cyan scan slit,
- * antenna fins, and side ear-cups on a headband. Inline SVG so it stays crisp
- * and animatable. `tile` draws the dark rounded app-icon background.
+ * The my-code "/mc" mark — the app as a slash command, in Claude Code's
+ * wardrobe: a terracotta slash and cream lowercase "mc" in monospace. The
+ * glyphs are traced from Menlo Bold and embedded as path data, so nothing
+ * depends on fonts at runtime and the mark is identical on every platform.
+ * `tile` draws the warm-charcoal rounded app-icon background.
  *
- * When `mood` is set the mark becomes reactive: it's wrapped in a `.sentinel`
- * shell with a glow halo, and CSS drives its eyes/breathing from the mood class
- * (idle = breathe + blink, thinking/tool = scan + halo, streaming = steady glow,
- * error = red flash). All motion is transform/opacity only, so it stays on the
- * compositor and costs nothing on the main thread. Omit `mood` for a static mark.
+ * When `mood` is set the mark is wrapped in a `.sentinel` shell and CSS
+ * animates it like a terminal: idle = breathe + the slash pulses like a
+ * resting cursor, thinking/tool = the slash tick-rotates like the ASCII
+ * spinner (| / - \), streaming = the slash warms up, error = red strobe.
+ * All motion is transform/opacity only, so it stays on the compositor and
+ * costs nothing on the main thread. Omit `mood` for a static mark.
  */
+
+const SMALL_PX = 28;
+
+/** "/" from Menlo Bold, centered with natural advances in the 120 viewBox. */
+const SLASH_PATH = "M34.8 37.0H40.9L19.4 83.0H13.3Z";
+
+/** "mc" from Menlo Bold, same metrics. */
+const LETTERS_PATH =
+  "M62.8 50.3Q63.7 48.3 65.1 47.4Q66.5 46.5 68.5 46.5Q72.5 46.5 74.0 49.2Q75.5 51.9 75.5 60.6V77.8H69.0V58.2Q69.0 54.7 68.4 53.6Q67.9 52.4 66.6 52.4Q65.2 52.4 64.6 53.6Q64.1 54.8 64.1 58.2V77.8H57.6V58.2Q57.6 54.8 57.1 53.6Q56.5 52.4 55.2 52.4Q53.8 52.4 53.3 53.6Q52.8 54.7 52.8 58.2V77.8H46.2V47.2H52.0V50.4Q52.7 48.6 54.2 47.5Q55.7 46.5 57.6 46.5Q59.4 46.5 61.0 47.6Q62.5 48.7 62.8 50.3ZM106.7 76.3Q104.7 77.4 102.3 78.0Q100.0 78.6 97.3 78.6Q90.2 78.6 86.2 74.3Q82.3 70.1 82.3 62.5Q82.3 55.0 86.3 50.7Q90.3 46.4 97.4 46.4Q99.8 46.4 102.1 47.0Q104.4 47.5 106.7 48.7V56.1Q104.9 54.6 102.8 53.8Q100.7 53.0 98.5 53.0Q94.6 53.0 92.5 55.4Q90.4 57.9 90.4 62.5Q90.4 67.1 92.5 69.6Q94.6 72.0 98.5 72.0Q100.8 72.0 102.8 71.3Q104.9 70.5 106.7 68.9Z";
+
+const SLASH = "#d97757";
+const CREAM = "#f0eee6";
+
 export function Logo({
   size = 32,
   tile = false,
@@ -26,9 +41,9 @@ export function Logo({
   className?: string;
   mood?: MascotMood;
 }): React.ReactElement {
-  const uid = useId().replace(/:/g, "");
-  const fur = `fur-${uid}`;
-  const glow = `glow-${uid}`;
+  // below SMALL_PX, a same-color stroke fattens the glyphs so the thin
+  // monospace stems survive title-bar sizes
+  const fatten = size < SMALL_PX ? 2 : 0;
   const svg = (
     <svg
       className={mood ? undefined : className}
@@ -38,52 +53,21 @@ export function Logo({
       xmlns="http://www.w3.org/2000/svg"
       aria-label="my-code"
     >
-      <defs>
-        <linearGradient id={fur} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#e2895f" />
-          <stop offset="100%" stopColor="#bf5c3b" />
-        </linearGradient>
-        <filter id={glow} x="-80%" y="-80%" width="260%" height="260%">
-          <feGaussianBlur stdDeviation="1.3" result="b" />
-          <feMerge>
-            <feMergeNode in="b" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-      </defs>
-
-      {tile && <rect width="120" height="120" rx="28" fill="#211f1d" />}
-
-      {/* headband (behind head) */}
-      <path d="M24 60 C 24 24, 96 24, 96 60" stroke="#464b52" strokeWidth="8" fill="none" strokeLinecap="round" />
-      <path d="M24 60 C 24 26, 96 26, 96 60" stroke="#767d86" strokeWidth="2.5" fill="none" strokeLinecap="round" />
-
-      {/* antenna fins */}
-      <path d="M42 33 L36 21 L50 30 Z" fill="#5f666e" />
-      <path d="M78 33 L84 21 L70 30 Z" fill="#5f666e" />
-
-      {/* head */}
-      <rect x="33" y="31" width="54" height="60" rx="24" fill={`url(#${fur})`} />
-
-      {/* goggles + two eyes (grouped so the mood CSS can scan them together) */}
-      <rect x="37" y="50" width="46" height="19" rx="9.5" fill="#141210" />
-      <rect x="37" y="50" width="46" height="19" rx="9.5" fill="none" stroke="#2a2724" strokeWidth="1" />
-      <g className="mc-eyes" filter={`url(#${glow})`}>
-        <circle className="mc-eye" cx="50" cy="59.5" r="4.6" fill="#37dbd0" />
-        <circle className="mc-eye" cx="70" cy="59.5" r="4.6" fill="#37dbd0" />
-        <circle cx="48" cy="57.5" r="1.5" fill="#eafffb" />
-        <circle cx="68" cy="57.5" r="1.5" fill="#eafffb" />
-      </g>
-
-      {/* ear cups */}
-      <rect x="15" y="48" width="20" height="30" rx="9" fill="#3d424a" />
-      <rect x="19" y="52" width="12" height="22" rx="6" fill="#22262b" />
-      <rect x="85" y="48" width="20" height="30" rx="9" fill="#3d424a" />
-      <rect x="89" y="52" width="12" height="22" rx="6" fill="#22262b" />
-      <g className="mc-leds" filter={`url(#${glow})`}>
-        <rect x="22" y="61" width="6" height="4" rx="2" fill="#37dbd0" />
-        <rect x="92" y="61" width="6" height="4" rx="2" fill="#37dbd0" />
-      </g>
+      {tile && <rect width="120" height="120" rx="28" fill="#201e19" />}
+      <path
+        className="mc-slash"
+        d={SLASH_PATH}
+        fill={SLASH}
+        stroke={fatten ? SLASH : undefined}
+        strokeWidth={fatten || undefined}
+      />
+      <path
+        className="mc-letters"
+        d={LETTERS_PATH}
+        fill={CREAM}
+        stroke={fatten ? CREAM : undefined}
+        strokeWidth={fatten || undefined}
+      />
     </svg>
   );
 
