@@ -10,7 +10,8 @@ export type IconName =
   | "chevronDown" | "chevronUp" | "chevronRight" | "check" | "trash" | "edit"
   | "more" | "spinner" | "sparkle" | "dot" | "search" | "folder" | "layers"
   | "sliders" | "plug" | "puzzle" | "user" | "mic" | "book" | "external"
-  | "sun" | "circleCheck" | "terminal" | "globe" | "eye" | "copy" | "retry";
+  | "sun" | "circleCheck" | "terminal" | "globe" | "eye" | "copy" | "retry"
+  | "home" | "code" | "clock" | "box" | "panel";
 
 const STROKE: Partial<Record<IconName, string>> = {
   menu: "M3 6h18 M3 12h18 M3 18h18",
@@ -39,6 +40,11 @@ const STROKE: Partial<Record<IconName, string>> = {
   eye: "M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
   copy: "M9 9h10v10H9z M5 15V5h10",
   retry: "M4 12a8 8 0 1 0 2.3-5.6 M4 4v4h4",
+  home: "M4 10.5L12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-6h-5v6H5a1 1 0 0 1-1-1z",
+  code: "M8.5 7L4 12l4.5 5 M15.5 7L20 12l-4.5 5",
+  clock: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18 M12 8v4.5l3 3",
+  box: "M3 7.5L12 3l9 4.5v9L12 21l-9-4.5z M3 7.5l9 4.5 9-4.5 M12 12v9",
+  panel: "M4 4h16a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z M9 4v16",
 };
 
 const FILL: Partial<Record<IconName, React.ReactNode>> = {

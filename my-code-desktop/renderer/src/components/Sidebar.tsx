@@ -4,105 +4,114 @@ import { AccountMenu } from "./AccountMenu";
 import type { SettingsSection } from "./Settings";
 import type { Bootstrap, Mode, SessionMeta } from "../../../electron/ipc";
 
+const isMac = window.mycode.platform === "darwin";
+
 export interface SidebarProps {
   boot: Bootstrap | null;
   mode: Mode;
   sessions: SessionMeta[];
   activeTitle: string | null;
   loadingId: string | null;
+  onMode: (m: Mode) => void;
   onNewChat: () => void;
   onResume: (id: string) => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
   onOpenSettings: (section?: SettingsSection) => void;
+  onOpenCommand: () => void;
 }
 
-/** Bucket sessions into Today / Yesterday / Last 7 days / Older by updatedAt. */
-function groupByDate(sessions: SessionMeta[]): [string, SessionMeta[]][] {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-  const t0 = startOfToday.getTime();
-  const y0 = t0 - 86_400_000;
-  const w0 = t0 - 6 * 86_400_000;
-  const g: Record<string, SessionMeta[]> = { Today: [], Yesterday: [], "Last 7 days": [], Older: [] };
-  const sorted = [...sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
-  for (const s of sorted) {
-    const u = s.updatedAt ?? 0;
-    if (u >= t0) g.Today.push(s);
-    else if (u >= y0) g.Yesterday.push(s);
-    else if (u >= w0) g["Last 7 days"].push(s);
-    else g.Older.push(s);
-  }
-  return [
-    ["Today", g.Today],
-    ["Yesterday", g.Yesterday],
-    ["Last 7 days", g["Last 7 days"]],
-    ["Older", g.Older],
-  ];
-}
-
+/**
+ * Claude-Desktop-style sidebar: window chrome row, Home/Code segmented control,
+ * primary nav, a flat Recents list, and the account footer. The whole column is
+ * the app's left rail — there is no separate title bar.
+ */
 export function Sidebar({
   boot,
   mode,
   sessions,
   activeTitle,
   loadingId,
+  onMode,
   onNewChat,
   onResume,
   onRename,
   onDelete,
   onOpenSettings,
+  onOpenCommand,
 }: SidebarProps): React.ReactElement {
-  const [query, setQuery] = useState("");
-  const filtered = sessions.filter((s) =>
-    (s.firstPrompt ?? s.id).toLowerCase().includes(query.trim().toLowerCase())
-  );
-  const groups = groupByDate(filtered);
+  const sorted = [...sessions].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
 
   return (
     <aside className="sidebar">
-      <div className="side-search no-drag">
-        <Icon name="search" size={14} />
-        <input
-          placeholder="Search chats…"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-        />
+      {/* window chrome — draggable; on macOS the native traffic lights sit here */}
+      <div className={`side-chrome ${isMac ? "is-mac" : ""}`}>
+        {!isMac && (
+          <div className="traffic no-drag">
+            <button className="tl tl-close" onClick={() => window.mycode.windowClose()} title="Close" aria-label="Close" />
+            <button className="tl tl-min" onClick={() => window.mycode.windowMinimize()} title="Minimize" aria-label="Minimize" />
+            <button className="tl tl-max" onClick={() => window.mycode.windowToggleMaximize()} title="Zoom" aria-label="Zoom" />
+          </div>
+        )}
+        <button className="chrome-btn no-drag" onClick={onOpenCommand} title="Search (Ctrl/⌘+K)" aria-label="Search">
+          <Icon name="search" size={15} />
+        </button>
       </div>
-      <button className="new-chat" onClick={onNewChat}>
-        <span className="plus"><Icon name="plus" size={17} /></span> New {mode === "code" ? "task" : "chat"}
-      </button>
 
-      <nav className="side-nav">
-        <button className="side-link" disabled><Icon name="folder" size={16} /> Projects</button>
-        <button className="side-link" disabled><Icon name="layers" size={16} /> Artifacts</button>
-        <button className="side-link" onClick={() => onOpenSettings()}><Icon name="sliders" size={16} /> Customize</button>
+      <div className="mode-tabs no-drag" role="tablist" aria-label="Mode">
+        <button
+          className={`mode-tab ${mode === "chat" ? "active" : ""}`}
+          role="tab"
+          aria-selected={mode === "chat"}
+          onClick={() => onMode("chat")}
+        >
+          <Icon name="home" size={13} /> Home
+        </button>
+        <button
+          className={`mode-tab ${mode === "code" ? "active" : ""}`}
+          role="tab"
+          aria-selected={mode === "code"}
+          onClick={() => onMode("code")}
+        >
+          <Icon name="code" size={13} /> Code
+        </button>
+      </div>
+
+      <nav className="snav">
+        <button className="snav-item snav-new" onClick={onNewChat}>
+          <Icon name="plus" size={15} /> New
+        </button>
+        <button className="snav-item" disabled title="Coming soon">
+          <Icon name="folder" size={15} /> Projects
+        </button>
+        <button className="snav-item" disabled title="Coming soon">
+          <Icon name="layers" size={15} /> Artifacts
+        </button>
+        <button className="snav-item" disabled title="Coming soon">
+          <Icon name="clock" size={15} /> Scheduled
+        </button>
+        <button className="snav-item" disabled title="Coming soon">
+          <Icon name="box" size={15} /> Dispatch <span className="badge-beta">Beta</span>
+        </button>
+        <button className="snav-item" onClick={() => onOpenSettings()}>
+          <Icon name="sliders" size={15} /> Customize
+        </button>
       </nav>
 
-      <div className="recents">
-        <div className="recents-list">
-          {filtered.length === 0 && (
-            <div className="recents-empty">{query ? "No matches" : "No sessions yet"}</div>
-          )}
-          {groups.map(([label, list]) =>
-            list.length === 0 ? null : (
-              <div key={label} className="recents-group">
-                <div className="recents-label">{label}</div>
-                {list.map((s) => (
-                  <RecentRow
-                    key={s.id}
-                    session={s}
-                    active={!!activeTitle && s.firstPrompt === activeTitle}
-                    loading={loadingId === s.id}
-                    onResume={() => onResume(s.id)}
-                    onRename={(title) => onRename(s.id, title)}
-                    onDelete={() => onDelete(s.id)}
-                  />
-                ))}
-              </div>
-            )
-          )}
-        </div>
+      <div className="side-label">Recents</div>
+      <div className="recents-list">
+        {sorted.length === 0 && <div className="recents-empty">No sessions yet</div>}
+        {sorted.map((s) => (
+          <RecentRow
+            key={s.id}
+            session={s}
+            active={!!activeTitle && s.firstPrompt === activeTitle}
+            loading={loadingId === s.id}
+            onResume={() => onResume(s.id)}
+            onRename={(title) => onRename(s.id, title)}
+            onDelete={() => onDelete(s.id)}
+          />
+        ))}
       </div>
 
       <div className="sidebar-foot">
@@ -169,7 +178,8 @@ function RecentRow({
   return (
     <div className={`recent-row ${active ? "active" : ""}`} ref={rowRef}>
       <button className="recent-item" title={label} onClick={onResume} disabled={loading}>
-        {label}
+        <span className="recent-dot" aria-hidden="true" />
+        <span className="recent-text">{label}</span>
       </button>
       <div className="recent-tail">
         {loading ? (

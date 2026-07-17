@@ -685,7 +685,16 @@ async function createWindow(): Promise<void> {
     // on other platforms; the renderer's translucent glass surfaces show it through.
     backgroundMaterial: "mica",
     title: "my-code",
-    icon: join(__dirname, "..", "..", "build", "icon.ico"),
+    // Windows wants the multi-size .ico; Linux takes the png. macOS ignores
+    // this entirely — the Dock icon comes from the bundle (packaged) or
+    // app.dock.setIcon (dev), wired below.
+    icon: join(
+      __dirname,
+      "..",
+      "..",
+      "build",
+      process.platform === "win32" ? "icon.ico" : "icon.png",
+    ),
     // macOS: keep the NATIVE traffic lights (the renderer hides its CSS clones
     // there) and center them in the 48px title bar. Elsewhere: fully frameless,
     // with the renderer drawing its own window controls.
@@ -713,6 +722,12 @@ async function createWindow(): Promise<void> {
 app.setName("my-code"); // dock/notification label (packaged builds also get productName)
 
 app.whenReady().then(async () => {
+  // Dev-only: without this the Dock shows Electron's default atom icon, since
+  // BrowserWindow.icon is a no-op on macOS. Packaged builds get the .icns that
+  // electron-builder derives from build/icon.png.
+  if (process.platform === "darwin" && !app.isPackaged) {
+    app.dock?.setIcon(join(__dirname, "..", "..", "build", "icon.png"));
+  }
   await loadPrefs();
   wireIpc();
   await createWindow();

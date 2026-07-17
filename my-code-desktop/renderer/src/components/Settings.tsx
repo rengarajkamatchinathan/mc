@@ -362,7 +362,7 @@ function ThemePanel(): React.ReactElement {
           <button className="btn" disabled={!/^#[0-9a-fA-F]{6}$/.test(custom)} onClick={() => pick(custom, custom)}>Apply</button>
         </div>
       </Field>
-      <div className="hint">Applies instantly across buttons, links, active items and highlights. The logo keeps its own identity.</div>
+      <div className="hint">Applies instantly across buttons, links, active items and highlights — the logo's slash follows along.</div>
     </Panel>
   );
 }

@@ -13,6 +13,8 @@ export interface ComposerProps {
   seed?: string;
   onSubmit: (text: string) => void;
   onAbort: () => void;
+  /** When provided (hero variant), renders the Chat/Code mode pills in the toolbar. */
+  onMode?: (m: Mode) => void;
 }
 
 export function Composer({
@@ -25,6 +27,7 @@ export function Composer({
   seed,
   onSubmit,
   onAbort,
+  onMode,
 }: ComposerProps): React.ReactElement {
   const [text, setText] = useState("");
   const [pulse, setPulse] = useState(false);
@@ -119,7 +122,7 @@ export function Composer({
         <textarea
           ref={ref}
           className="composer-input"
-          placeholder="How can I help you today?"
+          placeholder={variant === "hero" ? "Type / for skills" : "Write a message…"}
           value={text}
           rows={1}
           autoFocus={variant === "hero"}
@@ -134,6 +137,26 @@ export function Composer({
             <button className="icon-chip" title="Attach (coming soon)" disabled>
               <Icon name="plus" size={18} />
             </button>
+            {variant === "hero" && onMode && (
+              <div className="pill-seg" role="tablist" aria-label="Mode">
+                <button
+                  className={`pill ${mode === "chat" ? "active" : ""}`}
+                  role="tab"
+                  aria-selected={mode === "chat"}
+                  onClick={() => onMode("chat")}
+                >
+                  Chat
+                </button>
+                <button
+                  className={`pill ${mode === "code" ? "active" : ""}`}
+                  role="tab"
+                  aria-selected={mode === "code"}
+                  onClick={() => onMode("code")}
+                >
+                  Code
+                </button>
+              </div>
+            )}
           </div>
           <div className="composer-right">
             <ModelPicker current={model} />
@@ -209,7 +232,7 @@ function ModelPicker({ current }: { current: string }): React.ReactElement {
   return (
     <div className="model-picker" ref={wrapRef}>
       <button className="model-pill" title="Switch model" onClick={() => setOpen((o) => !o)}>
-        {selected || "…"} <Icon name="chevronDown" size={13} />
+        <b>{selected || "…"}</b> <Icon name="chevronDown" size={12} />
       </button>
       {open && (
         <div className="model-menu">

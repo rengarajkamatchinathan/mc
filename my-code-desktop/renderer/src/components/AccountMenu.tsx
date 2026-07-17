@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon";
+import { Logo } from "./Logo";
 import { providerLabel, orderProviders, type SettingsSection } from "./Settings";
 import type { AccountList, Bootstrap } from "../../../electron/ipc";
 
@@ -128,7 +129,7 @@ export function AccountMenu({
       )}
 
       <button className={`account no-drag ${open ? "open" : ""}`} onClick={() => setOpen((o) => !o)} title="Account & settings">
-        <span className="avatar"><Icon name="user" size={16} /></span>
+        <span className="avatar avatar-mark"><Logo size={22} tile /></span>
         <div className="account-meta">
           <div className="account-name">my-code</div>
           <div className="account-sub">{boot?.model ?? "…"}</div>

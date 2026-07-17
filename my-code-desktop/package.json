@@ -31,6 +31,10 @@
         "to": "mcp"
       }
     ],
+    "mac": {
+      "icon": "build/icon.png",
+      "category": "public.app-category.developer-tools"
+    },
     "win": {
       "icon": "build/icon.ico",
       "target": [

@@ -1,21 +1,20 @@
 /**
  * my-code-desktop — top-level shell.
  *
- * Claude-Desktop-style layout: frameless title bar with Chat/Code mode tabs,
- * a left sidebar (new chat / recents / account), and a main pane holding the
- * transcript + composer. Backend events (relayed from `my-code serve`) are
- * reduced into a flat transcript of typed items and rendered by <Transcript/>.
+ * Claude-Desktop-style layout: no title bar — the left sidebar carries the
+ * window chrome, Home/Code mode control, recents and account; the main pane
+ * holds the serif hero (or chat-top bar) + transcript + composer. Backend
+ * events (relayed from `my-code serve`) are reduced into a flat transcript of
+ * typed items and rendered by <Transcript/>.
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { Composer } from "./components/Composer";
 import { Transcript } from "./components/Transcript";
 import { ApprovalDock } from "./components/ApprovalDock";
 import { Settings, type SettingsSection } from "./components/Settings";
-import { Logo, type MascotMood } from "./components/Logo";
 import { Icon, type IconName } from "./components/Icon";
 import { TurnHud } from "./components/TurnHud";
 import { CommandPalette, type Command } from "./components/CommandPalette";
@@ -330,19 +329,19 @@ export function App(): React.ReactElement {
     })),
   ];
 
+  // Hero sub-row: pick (or re-pick) a working folder — jumps into Code mode.
+  const pickScope = async () => {
+    const picked = await window.mycode.pickFolder();
+    if (!picked) return;
+    const b = await window.mycode.setMode("code", picked);
+    setMode("code");
+    setBoot(b);
+    setConvTitle(null);
+    refreshSessions();
+  };
+
   return (
     <div className="app">
-      {/* ambient premium layer — living mesh gradient + grain + vignette */}
-      <div className="app-bg" aria-hidden="true"><b /><b /><b /><b /></div>
-      <div className="app-grain" aria-hidden="true" />
-      <div className="app-vignette" aria-hidden="true" />
-      <TitleBar
-        mode={mode}
-        onMode={switchMode}
-        onOpenSettings={() => setSettingsSection("general")}
-        onOpenCommand={() => setCmdkOpen(true)}
-        mood={busy ? (mood as MascotMood) : undefined}
-      />
       <div className="app-body">
         <Sidebar
           boot={boot}
@@ -350,18 +349,34 @@ export function App(): React.ReactElement {
           sessions={sessions}
           activeTitle={convTitle}
           loadingId={loadingId}
+          onMode={switchMode}
           onNewChat={newChat}
           onResume={resume}
           onRename={renameSession}
           onDelete={deleteSession}
           onOpenSettings={(section) => setSettingsSection(section ?? "general")}
+          onOpenCommand={() => setCmdkOpen(true)}
         />
         <main className="main">
-          <div className="main-head">
-            <span className="main-title">{convTitle ?? (mode === "code" ? "New task" : "New chat")}</span>
-            {boot?.cwd && <span className="cwd-chip" title={boot.cwd}>{shorten(boot.cwd)}</span>}
-            <TurnHud busy={busy} tokens={tokens} turnStart={turnStart} />
-          </div>
+          {items.length > 0 ? (
+            <div className="main-head">
+              <span className="main-title" title={convTitle ?? undefined}>
+                {convTitle ?? (mode === "code" ? "New task" : "New chat")}
+              </span>
+              {boot?.cwd && <span className="cwd-chip" title={boot.cwd}>{shorten(boot.cwd)}</span>}
+              <TurnHud busy={busy} tokens={tokens} turnStart={turnStart} />
+              <div className="head-actions no-drag">
+                <button className="icon-btn" onClick={() => setCmdkOpen(true)} title="Search (Ctrl/⌘+K)" aria-label="Search">
+                  <Icon name="search" size={15} />
+                </button>
+                <button className="icon-btn" onClick={() => setSettingsSection("general")} title="Settings" aria-label="Settings">
+                  <Icon name="sliders" size={15} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="main-drag" aria-hidden="true" />
+          )}
 
           <AnimatePresence mode="wait" initial={false}>
             {items.length === 0 ? (
@@ -374,8 +389,10 @@ export function App(): React.ReactElement {
                 transition={{ type: "spring", stiffness: 320, damping: 32, mass: 0.7 }}
               >
                 <div className="hero-inner">
-                  <Logo size={60} tile className="hero-logo" mood={busy ? (mood as MascotMood) : "idle"} />
-                  <h1 className="hero-greeting">{greeting(mode, preferredName)}</h1>
+                  <h1 className="hero-greeting">
+                    <Starburst />
+                    <span>{greeting(mode, preferredName)}</span>
+                  </h1>
                   <Composer
                     mode={mode}
                     model={boot?.model ?? "…"}
@@ -386,16 +403,29 @@ export function App(): React.ReactElement {
                     seed={seed}
                     onSubmit={submit}
                     onAbort={() => void window.mycode.abort()}
+                    onMode={switchMode}
                   />
-                  <div className="starter-chips">
+                  <div className="composer-sub">
+                    <button className="scope-pick" onClick={() => void pickScope()} title="Choose a project folder (Code mode)">
+                      <Icon name="folder" size={14} />
+                      {boot?.cwd ? shorten(boot.cwd) : "Project or folder"}
+                      <Icon name="chevronDown" size={12} className="chev-d" />
+                    </button>
+                    <span className="sub-usage" title="Active model">
+                      <Icon name="sparkle" size={12} /> {boot?.model ?? "…"}
+                    </span>
+                  </div>
+                  <div className="ideas">
+                    <p className="ideas-label">Ideas for you</p>
                     {starterChips(mode).map((c, i) => (
                       <button
                         key={c.label}
-                        className="starter-chip"
-                        style={{ animationDelay: `${0.12 + i * 0.07}s` }}
+                        className="idea"
+                        style={{ animationDelay: `${0.1 + i * 0.06}s` }}
                         onClick={() => setSeed(c.prompt + " ")}
                       >
-                        <Icon name={c.icon} size={15} /> {c.label}
+                        <span className="idea-thumb"><Icon name={c.icon} size={15} /></span>
+                        {c.label}
                       </button>
                     ))}
                   </div>
@@ -435,6 +465,7 @@ export function App(): React.ReactElement {
                   onSubmit={submit}
                   onAbort={() => void window.mycode.abort()}
                 />
+                <p className="disclaimer">my-code is AI and can make mistakes. Please double-check responses.</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -614,16 +645,30 @@ function historyToItems(messages: HistoryMessage[]): Item[] {
   return items;
 }
 
-/** Time-aware, mode-aware greeting for the home hero, personalised if a name is set. */
+/** Time-aware, mode-aware greeting for the home hero, personalised if a name is set.
+ *  Kept short — it's set in the large serif display face next to the starburst. */
 function greeting(mode: Mode, name?: string): string {
+  const who = name?.trim() ? `, ${name.trim().split(/\s+/)[0]}` : "";
+  if (mode === "code") return `What are we building${who}?`;
   const h = new Date().getHours();
   const time =
     h >= 5 && h < 12 ? "Good morning" :
     h >= 12 && h < 17 ? "Good afternoon" :
     h >= 17 && h < 21 ? "Good evening" :
-    "Burning the midnight oil";
-  const who = name?.trim() ? `, ${name.trim().split(/\s+/)[0]}` : "";
-  return mode === "code" ? `${time}${who} — what are we building?` : `${time}${who}. How can I help?`;
+    "Back at it";
+  return `${time}${who}`;
+}
+
+/** The terracotta starburst that fronts the hero greeting (Claude-Desktop style). */
+function Starburst(): React.ReactElement {
+  const ray =
+    "M12 1.5c.5 3.9.9 5.9 2 7 1.1 1.1 3.1 1.5 7 2v3c-3.9.5-5.9.9-7 2-1.1 1.1-1.5 3.1-2 7h-.001c-.5-3.9-.9-5.9-2-7-1.1-1.1-3.1-1.5-7-2v-3c3.9-.5 5.9-.9 7-2 1.1-1.1 1.5-3.1 2-7Z";
+  return (
+    <svg className="starburst" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d={ray} transform="rotate(45 12 12)" />
+      <path d={ray} />
+    </svg>
+  );
 }
 
 interface Starter { label: string; prompt: string; icon: IconName }
