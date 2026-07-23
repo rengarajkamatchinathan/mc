@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Markdown } from "../Markdown";
 import { ToolCard, fmtDur } from "./ToolCard";
 import { Icon, type IconName } from "./Icon";
+import { Logo, type MascotMood } from "./Logo";
 import type { Activity, Item, TurnReceipt } from "../transcript";
 import type { Mode } from "../../../electron/ipc";
 
@@ -341,11 +342,19 @@ function useElapsed(since: number | null): number | null {
 }
 
 /** Live status line: breathing orb + shimmering activity verb + elapsed. */
+/** Pick the mark's animation from the activity verb: smooth flow while writing
+ *  the reply, fast tick while running a tool, plain tick while reasoning. */
+function moodForVerb(verb: string): MascotMood {
+  if (/respond|writ|generat|stream|draft/i.test(verb)) return "streaming";
+  if (/run|read|search|edit|creat|fetch|call|tool|execut/i.test(verb)) return "tool";
+  return "thinking";
+}
+
 function StatusLine({ activity, turnStart }: { activity: Activity; turnStart: number | null }): React.ReactElement {
   const elapsed = useElapsed(turnStart);
   return (
     <div className="status-line">
-      <span className="status-orb" aria-hidden="true" />
+      <Logo size={24} mood={moodForVerb(activity.verb)} className="status-mark" />
       <span className="status-shimmer">
         {activity.verb}
         {activity.target && <span className="status-target"> {activity.target}</span>}…

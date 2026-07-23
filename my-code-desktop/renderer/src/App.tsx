@@ -18,6 +18,7 @@ import { Settings, type SettingsSection } from "./components/Settings";
 import { Icon, type IconName } from "./components/Icon";
 import { TurnHud } from "./components/TurnHud";
 import { CommandPalette, type Command } from "./components/CommandPalette";
+import { Logo } from "./components/Logo";
 import { applyAccent, applyAppearance } from "./theme";
 import type {
   Bootstrap,
@@ -47,6 +48,9 @@ export function App(): React.ReactElement {
   const turnStartRef = useRef<number | null>(null);
   const tokensRef = useRef<number | undefined>(undefined);
   const [convTitle, setConvTitle] = useState<string | null>(null);
+  // id of the session currently open — highlights exactly one Recents row.
+  // Tracked explicitly because the backend's Bootstrap.sessionId is unreliable.
+  const [activeId, setActiveId] = useState<string | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [settingsSection, setSettingsSection] = useState<SettingsSection | null>(null);
   const [cmdkOpen, setCmdkOpen] = useState(false);
@@ -292,6 +296,7 @@ export function App(): React.ReactElement {
     const b = await window.mycode.newSession();
     setBoot(b);
     setConvTitle(null);
+    setActiveId(b.sessionId ?? null);
   };
 
   const resume = async (id: string) => {
@@ -302,6 +307,7 @@ export function App(): React.ReactElement {
       setBoot(b);
       const s = sessions.find((x) => x.id === id);
       setConvTitle(s?.firstPrompt ?? "Resumed session");
+      setActiveId(id);
     } finally {
       setLoadingId(null);
     }
@@ -337,6 +343,7 @@ export function App(): React.ReactElement {
     setMode("code");
     setBoot(b);
     setConvTitle(null);
+    setActiveId(b.sessionId ?? null);
     refreshSessions();
   };
 
@@ -347,7 +354,7 @@ export function App(): React.ReactElement {
           boot={boot}
           mode={mode}
           sessions={sessions}
-          activeTitle={convTitle}
+          activeId={activeId}
           loadingId={loadingId}
           onMode={switchMode}
           onNewChat={newChat}
@@ -390,7 +397,7 @@ export function App(): React.ReactElement {
               >
                 <div className="hero-inner">
                   <h1 className="hero-greeting">
-                    <Starburst />
+                    <Logo size={36} mood="idle" className="hero-mark" />
                     <span>{greeting(mode, preferredName)}</span>
                   </h1>
                   <Composer
@@ -646,7 +653,7 @@ function historyToItems(messages: HistoryMessage[]): Item[] {
 }
 
 /** Time-aware, mode-aware greeting for the home hero, personalised if a name is set.
- *  Kept short — it's set in the large serif display face next to the starburst. */
+ *  Kept short — it's set in the large serif display face next to the trine mark. */
 function greeting(mode: Mode, name?: string): string {
   const who = name?.trim() ? `, ${name.trim().split(/\s+/)[0]}` : "";
   if (mode === "code") return `What are we building${who}?`;
@@ -657,18 +664,6 @@ function greeting(mode: Mode, name?: string): string {
     h >= 17 && h < 21 ? "Good evening" :
     "Back at it";
   return `${time}${who}`;
-}
-
-/** The terracotta starburst that fronts the hero greeting (Claude-Desktop style). */
-function Starburst(): React.ReactElement {
-  const ray =
-    "M12 1.5c.5 3.9.9 5.9 2 7 1.1 1.1 3.1 1.5 7 2v3c-3.9.5-5.9.9-7 2-1.1 1.1-1.5 3.1-2 7h-.001c-.5-3.9-.9-5.9-2-7-1.1-1.1-3.1-1.5-7-2v-3c3.9-.5 5.9-.9 7-2 1.1-1.1 1.5-3.1 2-7Z";
-  return (
-    <svg className="starburst" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d={ray} transform="rotate(45 12 12)" />
-      <path d={ray} />
-    </svg>
-  );
 }
 
 interface Starter { label: string; prompt: string; icon: IconName }

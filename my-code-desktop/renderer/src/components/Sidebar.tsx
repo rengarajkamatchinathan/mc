@@ -10,7 +10,8 @@ export interface SidebarProps {
   boot: Bootstrap | null;
   mode: Mode;
   sessions: SessionMeta[];
-  activeTitle: string | null;
+  /** id of the session currently open — used to highlight exactly one row */
+  activeId: string | null;
   loadingId: string | null;
   onMode: (m: Mode) => void;
   onNewChat: () => void;
@@ -30,7 +31,7 @@ export function Sidebar({
   boot,
   mode,
   sessions,
-  activeTitle,
+  activeId,
   loadingId,
   onMode,
   onNewChat,
@@ -105,7 +106,7 @@ export function Sidebar({
           <RecentRow
             key={s.id}
             session={s}
-            active={!!activeTitle && s.firstPrompt === activeTitle}
+            active={!!activeId && s.id === activeId}
             loading={loadingId === s.id}
             onResume={() => onResume(s.id)}
             onRename={(title) => onRename(s.id, title)}

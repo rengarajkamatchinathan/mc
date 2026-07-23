@@ -363,14 +363,14 @@ button:focus-visible, .fld:focus-visible, textarea:focus-visible, input:focus-vi
 /* ─── Home hero (empty / new state) ─── */
 .hero { position: relative; flex: 1; display: flex; overflow-y: auto; padding: var(--sp-6); }
 .hero-inner { position: relative; z-index: 1; margin: auto; width: 100%; max-width: 680px; display: flex; flex-direction: column; align-items: stretch; }
-/* serif greeting fronted by the terracotta starburst */
+/* serif greeting fronted by the terracotta chevron-trine mark */
 .hero-greeting {
   font-family: var(--serif); font-size: clamp(30px, 3.4vw, 40px); font-weight: 500;
   letter-spacing: -.01em; color: var(--text); margin: 0 0 30px;
   display: flex; align-items: center; justify-content: center; gap: 14px;
   text-align: center; text-wrap: balance;
 }
-.starburst { width: .85em; height: .85em; flex: 0 0 auto; color: var(--accent); }
+.hero-mark { flex: 0 0 auto; }
 
 /* "Ideas for you" rows (replace the old starter chips) */
 .ideas { margin-top: 44px; }
@@ -738,48 +738,43 @@ select.fld { appearance: none; }
 .sentinel { position: relative; display: inline-flex; align-items: center; justify-content: center; }
 .sentinel .halo { position: absolute; inset: -26%; border-radius: 50%; background: radial-gradient(circle, var(--accent-hover), transparent 65%); filter: blur(9px); opacity: 0; transition: opacity .5s ease; pointer-events: none; }
 .sentinel > svg { position: relative; z-index: 1; display: block; }
-/* The slash follows the theme accent. SVG presentation attributes can't take
-   var(), so the color lives here (class rules beat fill/stroke attributes);
-   [stroke] scopes the override to the small-size fatten case. Letters stay
-   cream on the dark tile; tileless marks flip to ink in light theme. */
-.mc-slash { fill: var(--accent-hover); transform-box: fill-box; transform-origin: center; transition: fill .3s ease, stroke .3s ease; }
-.mc-slash[stroke] { stroke: var(--accent-hover); }
-.mc-letters { transition: fill .3s ease, stroke .3s ease; }
-:root[data-theme="light"] .mc-letters { fill: #2a2723; }
-:root[data-theme="light"] .mc-letters[stroke] { stroke: #2a2723; }
-:root[data-theme="light"] svg[data-tile] .mc-letters { fill: #f0eee6; }
-:root[data-theme="light"] svg[data-tile] .mc-letters[stroke] { stroke: #f0eee6; }
-/* idle — the halo breathes behind the mark, slash pulses like a resting cursor.
-   The svg itself is never transformed or filtered: scaling/filtering it makes
-   the browser composite a cached raster and the glyphs go soft. */
+/* The chevron trine follows the theme accent. SVG presentation attributes
+   can't take var(), so the color lives here (class rules beat the stroke
+   attribute). The trine spins about the viewBox center; we transform the
+   inner <g>, never the <svg>, so the vector re-renders crisp instead of
+   compositing a cached raster. */
+.mc-chev { fill: none; stroke: var(--accent-hover); transition: stroke .3s ease; }
+.trine { transform-box: view-box; transform-origin: 60px 60px; }
+/* idle — halo breathes behind the mark, the trine pulses softly at rest. */
 .sentinel-idle .halo { animation: breathe 4.5s ease-in-out infinite; }
-.sentinel-idle .mc-slash { animation: slashPulse 4.8s ease-in-out infinite; }
+.sentinel-idle .trine { animation: trineIdle 4.8s ease-in-out infinite; }
 @keyframes breathe { 0%,100% { opacity: .16; } 50% { opacity: .32; } }
-@keyframes slashPulse { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
-/* thinking / tool — halo pulse + the slash tick-rotates like the ASCII
-   spinner (| / - \); tool is the fast one */
+@keyframes trineIdle { 0%,100% { opacity: 1; transform: scale(.97); } 50% { opacity: .6; transform: scale(1.02); } }
+/* thinking / tool — halo pulse + the trine tick-rotates in 8 steps like the
+   ASCII spinner. 120° is a full turn given the mark's three-fold symmetry;
+   tool is the fast one. */
 .sentinel-thinking .halo, .sentinel-tool .halo { opacity: .5; animation: haloPulse 1.5s ease-in-out infinite; }
 @keyframes haloPulse { 0%,100% { opacity: .5; } 50% { opacity: .9; } }
-.sentinel-thinking .mc-slash { animation: slashSpin 1.6s steps(8, end) infinite; }
-.sentinel-tool .mc-slash { animation: slashSpin .6s steps(8, end) infinite; }
-@keyframes slashSpin { to { transform: rotate(360deg); } }
-/* streaming — the slash warms up */
+.sentinel-thinking .trine { animation: trineStep 1.6s steps(8, end) infinite; }
+.sentinel-tool .trine { animation: trineStep .6s steps(8, end) infinite; }
+@keyframes trineStep { to { transform: rotate(120deg); } }
+/* streaming — smooth continuous flow, chevrons warm up, glow holds steady */
 .sentinel-streaming .halo { opacity: .35; }
-.sentinel-streaming .mc-slash { fill: color-mix(in srgb, var(--accent-hover) 72%, #fff); stroke: color-mix(in srgb, var(--accent-hover) 72%, #fff); }
+.sentinel-streaming .trine { animation: trineFlow 2s linear infinite; }
+.sentinel-streaming .mc-chev { stroke: color-mix(in srgb, var(--accent-hover) 72%, #fff); }
+@keyframes trineFlow { to { transform: rotate(360deg); } }
 /* error — mark goes red with a hard strobe */
-.sentinel-error .mc-slash, .sentinel-error .mc-letters { fill: var(--del); stroke: var(--del); }
+.sentinel-error .mc-chev { stroke: var(--del); }
 .sentinel-error > svg { animation: errFlash .55s steps(2, end) infinite; }
 @keyframes errFlash { 50% { opacity: .45; } }
 .sentinel-error .halo { opacity: .5; background: radial-gradient(circle, var(--del), transparent 65%); }
 
-/* ─── Live status line: breathing orb + activity verb + elapsed ─── */
+/* ─── Live status line: spinning /mc mark + activity verb + elapsed ─── */
 .status-line { display: flex; align-items: center; gap: 9px; padding: 6px 2px; animation: rowIn .3s ease both; }
-.status-orb {
-  width: 13px; height: 13px; border-radius: 50%; flex: 0 0 13px;
-  background: radial-gradient(circle at 35% 30%, #ffd9c4, var(--accent) 65%);
-  animation: orbBreathe 1.6s ease-in-out infinite;
-}
-@keyframes orbBreathe { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.8); opacity: .65; } }
+/* the mark stands in for the old breathing orb; its glow goes muddy this small,
+   so drop the halo and let the trine read as a crisp mini-spinner */
+.status-mark { flex: 0 0 auto; }
+.status-mark .halo { display: none; }
 .status-shimmer {
   font-size: var(--fs-md); font-weight: 550;
   background: linear-gradient(100deg, var(--text-faint) 35%, var(--accent-hover) 50%, var(--text-faint) 65%);
